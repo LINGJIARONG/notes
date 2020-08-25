@@ -139,7 +139,7 @@
 
    调用方法的时候通过 `super.h.invoke(this, m1, (Object[])null);` 调用，其中的 `super.h.invoke` 实际上是在创建代理的时候传递给 `Proxy.newProxyInstance` 的 xxxHandler 对象，它继承 InvocationHandler 类，负责实际的调用处理逻辑。
 
-   ​      ![image-20200705231529903](./image/image-20200705231529903.png)
+   ​      ![image-20200705231529903](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200705231529903.png)
 
    
 
@@ -444,7 +444,7 @@ https://blog.csdn.net/zgrgfr/article/details/74455547
   
   
   
-  ![image-20200822001337259](./image/image-20200822001337259.png)
+  ![image-20200822001337259](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200822001337259.png)
   
   
   
@@ -464,7 +464,7 @@ https://blog.csdn.net/zgrgfr/article/details/74455547
   
   
   
-  ![image-20200822001604290](./image/image-20200822001604290.png)
+  ![image-20200822001604290](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200822001604290.png)
   
   在主从复制结构中，要保证事务的持久性和一致性，需要对日志相关变量设置为如下：
   
@@ -502,7 +502,7 @@ Insert Undo Log是INSERT操作产生的undo log。
 
 INSERT操作的记录由于是该数据的第一个记录，对其他事务不可见，该Undo Log可以在事务提交后直接删除。
 
-![image-20200822004014716](./image/image-20200822004014716.png)
+![image-20200822004014716](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200822004014716.png)
 
 
 
@@ -516,7 +516,7 @@ Update Undo Log记录对DELETE和UPDATE操作产生的Undo Log。
 
 Update Undo Log会提供MVCC机制，因此不能在事务提交时就删除，而是放入undo log链表，等待purge线程进行最后的删除。
 
-![image-20200822004101341](./image/image-20200822004101341.png)
+![image-20200822004101341](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200822004101341.png)
 
 ## binlog记录格式 ,主从复制三种方式
 
@@ -779,7 +779,7 @@ https://www.jianshu.com/p/59a28a0a88aa
 - next：将返回下一页数据的图谱 API 端点。
 - previous：将返回上一页数据的图谱 API 端点。
 
-![image-20200706190650629](./image/image-20200706190650629.png)
+![image-20200706190650629](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200706190650629.png)
 
 
 
@@ -1102,7 +1102,7 @@ MySQL里有一个概念，叫binlog日志，就是每个增删改类的操作，
 - 主从复制的数据丢失问题，以及半同步复制的原理
 - 并行复制的原理，多库并发重放relay日志，缓解主从延迟问题
 
-![image-20200730005610522](./image/image-20200730005610522.png)
+![image-20200730005610522](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200730005610522.png)
 
 
 
@@ -1135,7 +1135,7 @@ InnoDB存储引擎由内存池和一些后台线程组成，其各自主要的�
 
 - 缓存重做日志（redo log）
 
-  ![image-20200731135311965](./image/image-20200731135311965.png)
+  ![image-20200731135311965](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200731135311965.png)
 
  **缓冲池**
 InnoDB缓冲池是为了通过内存的速度来弥补磁盘速度慢对数据库性能造成的影响。其工作方式总是将数据库文件按页（每页16K）读取到缓冲池，然后按最近最少使用（LRU）的算法来保留在缓冲池中的缓存数据。在数据库中进行读操作时，首先将从磁盘读到的页存放在缓冲池中，下一次读取相同的页时，首先判定是否存在缓冲池中，如果有就是被命中直接读取，没有的话就从磁盘中读取。在数据库进行改操作时，首先修改缓冲池中的页（修改后，该页即为脏页），然后在以一定的频率刷新到磁盘上。这里的刷新机制不是每页在发生变更时触发。而是通过一种checkpoint机制刷新到磁盘的。
@@ -1171,7 +1171,7 @@ InnoDB 存储引擎先将重做日志信息放入这个缓冲区,然后以一定
 - 刷新内存池中的数据，保证缓冲池中缓存的数据最新
 - 将已修改数据文件刷新到磁盘文件
 - 保证数据库异常时InnoDB能恢复到正常运行状态
-- ![image-20200731140027071](./image/image-20200731140027071.png)
+- ![image-20200731140027071](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200731140027071.png)
 
 
 
@@ -1267,21 +1267,21 @@ public class Test {
 
 方法区
 
-![image-20200809220615632](./image/image-20200809220615632.png)
+![image-20200809220615632](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200809220615632.png)
 
 
 
-![image-20200809220822476](./image/image-20200809220822476.png)
+![image-20200809220822476](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200809220822476.png)
 
 
 
-![image-20200809220839717](./image/image-20200809220839717.png)
+![image-20200809220839717](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200809220839717.png)
 
 JVM 深入了解java 虚拟机 Page 39 -- 49 jvm结构
 
-![image-20200809170725658](./image/image-20200809170725658.png)
+![image-20200809170725658](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200809170725658.png)
 
-![image-20200809170812538](./image/image-20200809170812538.png)
+![image-20200809170812538](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200809170812538.png)
 
 # JAVA 
 
@@ -1711,7 +1711,7 @@ https://blog.csdn.net/zqixiao_09/article/details/50877756
 
 stat -x file 
 
-![image-20200724230508284](./image/image-20200724230508284.png)
+![image-20200724230508284](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200724230508284.png)
 
 ## fork的实现分为以下两步
 
@@ -1853,19 +1853,19 @@ I/O相关：记录进程与各种I/O设备之间的交互
 
 float
 
-![image-20200629130913247](./image/image-20200629130913247.png)
+![image-20200629130913247](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200629130913247.png)
 
-![image-20200629130931296](./image/image-20200629130931296.png)
+![image-20200629130931296](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200629130931296.png)
 
 
 
-![image-20200629130947046](./image/image-20200629130947046.png)
+![image-20200629130947046](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200629130947046.png)
 
 1. double 编码
 
-   ![image-20200629131016685](./image/image-20200629131016685.png)
+   ![image-20200629131016685](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200629131016685.png)
 
-   ![image-20200629131050228](./image/image-20200629131050228.png)
+   ![image-20200629131050228](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200629131050228.png)
 
 2. ## 进程与线程
 
@@ -2052,7 +2052,7 @@ float
 
 12. ## Linux下 文件描述符（fd）与 文件指针（FILE*）
 
-    ![image-20200719165144942](./image/image-20200719165144942.png)
+    ![image-20200719165144942](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200719165144942.png)
 
 13. ### 磁盘调度算法  （SCAN：电梯调度算法）
 
@@ -2060,7 +2060,7 @@ float
 
 
 
-![image-20200719192434420](./image/image-20200719192434420.png)
+![image-20200719192434420](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200719192434420.png)
 
 # 网络
 
@@ -2093,7 +2093,7 @@ float
 
    ## PPP
 
-   ![image-20200704172812352](./image/image-20200704172812352.png)
+   ![image-20200704172812352](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200704172812352.png)
 
    ### 透明传输的基本概念：
 
@@ -2199,7 +2199,7 @@ ping+一个公网地址，网络层及以下会发生什么
 
 4. 最后，在主机C已学到路由器2端口MAC地址，路由器2端口转发给路由器1端口，路由1端口学到主机A的MAC地址的情况下，他们就不需要再做ARP解析，就将ICMP的回显请求回复过来。报文格式大致如下: 
 
-5. ![image-20200722174438310](./image/image-20200722174438310.png)
+5. ![image-20200722174438310](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200722174438310.png)
 
 
 
@@ -2240,13 +2240,13 @@ PC1（192.168.0.2）----------------(eth0（192.168.0.1） 路由器 eth1（192.
 
 路由器的几张表一直没搞太清楚。所以可能会有一些问题。附带两张图
 
- ![image-20200722175458938](./image/image-20200722175458938.png)
+ ![image-20200722175458938](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200722175458938.png)
 
 
 
 上图为路由器中各表的关系图
 
-![image-20200722175509907](./image/image-20200722175509907.png)
+![image-20200722175509907](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200722175509907.png)
 
 上图为路由器内部转发图
 
@@ -2459,7 +2459,7 @@ Tahoe是等RTO超时，FR是在收到3个duplicate ACK时就开启重传，而�
 - 重传Duplicated ACKs指定的数据包
 - 如果再收到 duplicated Acks，那么cwnd = cwnd +1
 - 如果收到了新的Ack，那么，cwnd = sshthresh ，然后进入拥塞避免算法。
-- ![image-20200727200827065](./image/image-20200727200827065.png)
+- ![image-20200727200827065](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200727200827065.png)
 
 
 
@@ -2812,7 +2812,7 @@ http协议本身是一种无状态的协议，而这就意味着如果用户向�
 - 创建一个\<script\>标签，把那个跨域的API数据接口地址，赋值给script的src,还要在这个地址中向服务器传递该函数名（可以通过问号传参:?callback=show）。
 - 服务器接收到请求后，需要进行特殊的处理：把传递进来的函数名和它需要给你的数据拼接成一个字符串,例如：传递进去的函数名是show，它准备好的数据是`show('我不爱你')`。
 - 最后服务器把准备的数据通过HTTP协议返回给客户端，客户端再调用执行之前声明的回调函数（show），对返回的数据进行操作。
-- ![image-20200719144237595](./image/image-20200719144237595.png)
+- ![image-20200719144237595](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200719144237595.png)
 
 JSONP优点是简单兼容性好，可用于解决主流浏览器的跨域数据访问的问题。**缺点是仅支持get方法具有局限性**
 
@@ -2898,7 +2898,7 @@ get, post, option, head,put,delete,connect, trace
 
 https://www.jianshu.com/p/7158568e4867
 
-![image-20200628223628782](./image/image-20200628223628782.png)
+![image-20200628223628782](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200628223628782.png)
 
 ###### Client Hello
 
@@ -2914,11 +2914,11 @@ https://www.jianshu.com/p/7158568e4867
 
 
 
-![image-20200628230637454](./image/image-20200628230637454.png)
+![image-20200628230637454](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200628230637454.png)
 
 
 
-![image-20200628231144309](./image/image-20200628231144309.png)
+![image-20200628231144309](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200628231144309.png)
 
 
 
@@ -2957,11 +2957,11 @@ https://www.jianshu.com/p/7158568e4867
 
 ## csrf
 
-![image-20200719125351860](./image/image-20200719125351860.png)
+![image-20200719125351860](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200719125351860.png)
 
 
 
-![image-20200719125410144](./image/image-20200719125410144.png)
+![image-20200719125410144](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200719125410144.png)
 
 
 
@@ -3436,7 +3436,7 @@ Spring bean 支持 5 种 scope：
 
 ### **spring bean 容器的生命周期是什么样的**
 
-![image-20200808113153863](./image/image-20200808113153863.png)
+![image-20200808113153863](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200808113153863.png)
 
 spring bean 容器的生命周期流程如下：
 
@@ -3458,7 +3458,7 @@ spring bean 容器的生命周期流程如下：
 
 9. 如果为 bean 指定了 destroy 方法（ <bean>的 destroy-method 属性），那么将调用它。
 
-   ![image-20200720182058068](./image/image-20200720182058068.png)
+   ![image-20200720182058068](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200720182058068.png)
 
 ###  **什么是 AOP？**
 
@@ -3623,7 +3623,7 @@ Spring Web MVC 框架提供 模型-视图-控制器 架构和随时可用的组�
 
 ### DispatcherServlet 的工作流程
 
-![image-20200712210842032](./image/image-20200712210842032.png)
+![image-20200712210842032](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200712210842032.png)
 
 ①客户端的所有请求都交给前端控制器DispatcherServlet来处理，它会负责调用系统的其他模块来真正处理用户的请求。
 
@@ -3683,19 +3683,19 @@ https://zhuanlan.zhihu.com/p/53022678
   
   SpringBoot的启动主要是通过实例化SpringApplication来启动的，启动过程主要做了以下几件事情：配置属性、获取监听器，发布应用开始启动事件初、始化输入参数、配置环境，输出banner、**创建上下文**、预处理上下文、**刷新上下文(加载tomcat容器)**、再刷新上下文、发布应用已经启动事件、发布应用启动完成事件。
 
-![image-20200808120457256](./image/image-20200808120457256.png)
+![image-20200808120457256](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200808120457256.png)
 
 
 
 
 
-![image-20200808121233209](./image/image-20200808121233209.png)
+![image-20200808121233209](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200808121233209.png)
 
-![image-20200808121705655](./image/image-20200808121705655.png)
+![image-20200808121705655](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200808121705655.png)
 
 
 
-![image-20200808123648811](./image/image-20200808123648811.png)
+![image-20200808123648811](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200808123648811.png)
 
 
 
@@ -3739,7 +3739,7 @@ public class EmployeeService
 
 在应用系统调用声明@Transactional 的目标方法时，Spring Framework 默认使用 AOP 代理，在代码运行时生成一个代理对象，根据@Transactional 的属性配置信息，这个代理对象决定该声明@Transactional 的目标方法是否由拦截器 TransactionInterceptor 来使用拦截，在 TransactionInterceptor 拦截时，会在在目标方法开始执行之前创建并加入事务，并执行目标方法的逻辑, 最后根据执行情况是否出现异常，利用抽象事务管理器(图 2 有相关介绍)AbstractPlatformTransactionManager 操作数据源 DataSource 提交或回滚事务, 如图 。
 
-![image-20200711211019358](./image/image-20200711211019358.png)
+![image-20200711211019358](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200711211019358.png)
 
 
 
@@ -3881,9 +3881,9 @@ CAS 只对单个共享变量有效，当操作涉及跨多个共享变量时 CAS
 >    
 >    
 >
->    ![image-20200707132735634](./image/image-20200707132735634.png)
+>    ![image-20200707132735634](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200707132735634.png)
 >
-> ![image-20200707133446327](./image/image-20200707133446327.png)
+> ![image-20200707133446327](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200707133446327.png)
 >
 > 2. 
 
@@ -3897,7 +3897,7 @@ CAS 只对单个共享变量有效，当操作涉及跨多个共享变量时 CAS
 
 3. 拦截器（Interceptor）：java里的拦截器提供的是非系统级别的拦截，也就是说，就覆盖面来说，拦截器不如过滤器强大，但是更有针对性。Java中的拦截器是基于Java反射机制实现的，更准确的划分，应该是基于JDK实现的动态代理。它依赖于具体的接口，在运行期间动态生成字节码。拦截器是动态拦截Action调用的对象，它提供了一种机制可以使开发者在一个Action执行的前后执行一段代码，也可以在一个Action执行前阻止其执行，同时也提供了一种可以提取Action中可重用部分代码的方式。在AOP中，拦截器用于在某个方法或者字段被访问之前，进行拦截然后再之前或者之后加入某些操作。java的拦截器主要是用在插件上，扩展件上比如 Hibernate Spring Struts2等，有点类似面向切片的技术，在用之前先要在配置文件即xml，文件里声明一段的那个东西。
 
-   ![image-20200711223941102](./image/image-20200711223941102.png)
+   ![image-20200711223941102](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200711223941102.png)
 
 
 
@@ -3917,7 +3917,7 @@ Example，A 网站和 B 网站是同一家公司的关联服务。现在要求�
 
 另一种方案是服务器索性不保存 session 数据了，所有数据都保存在客户端，每次请求都发回服务器。JWT 就是这种方案的一个代表。
 
-![image-20200714184240157](./image/image-20200714184240157.png)
+![image-20200714184240157](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200714184240157.png)
 
 ## JWT 的几个特点
 
@@ -3964,7 +3964,7 @@ Redis 是单进程单线程的模型，因为 Redis 完全是基于内存的操�
 
 ## Redis 的淘汰策略
 
-![image-20200623114805276](./image/image-20200623114805276.png)
+![image-20200623114805276](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200623114805276.png)
 
 
 
@@ -4070,7 +4070,7 @@ solution : 在接口层增加校验，比如用户鉴权，参数做校验，不
 
 solution ： 设置热点数据永不过期，或者加上互斥锁就搞定了
 
-![image-20200710000746609](./image/image-20200710000746609.png)
+![image-20200710000746609](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200710000746609.png)
 
 
 
@@ -4094,7 +4094,7 @@ solution ： 设置热点数据永不过期，或者加上互斥锁就搞定了
 - 从节点发送 Ping 信号，主节点返回 Pong，两边能互相通信。
 - 连接建立后，主节点将所有数据发送给从节点（数据同步）。
 - 主节点把当前的数据同步给从节点后，便完成了复制的建立过程。接下来，主节点就会持续的把写命令发送给从节点，保证主从数据一致性。
-- ![image-20200623151253153](./image/image-20200623151253153.png)
+- ![image-20200623151253153](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200623151253153.png)
 
 #### **psync 命令需要 3 个组件支持：**
 
@@ -4134,7 +4134,7 @@ redisDb 结构的 expire 字典（过期字典）保存了所有键的过期时�
 
 过期字典的值保存了键所指向的数据库键的过期时间
 
-![image-20200728015102720](./image/image-20200728015102720.png)
+![image-20200728015102720](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200728015102720.png)
 
 ### 哨兵
 
@@ -4156,7 +4156,7 @@ Redis Sentinel（哨兵）主要功能包括**主节点存活检测、主从运�
 
 #### 哨兵工作原理 https://juejin.im/post/5b7d226a6fb9a01a1e01ff64
 
-![image-20200623200842696](./image/image-20200623200842696.png)
+![image-20200623200842696](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200623200842696.png)
 
 哨兵系统的搭建过程，有几点需要注意：
 
@@ -4196,7 +4196,7 @@ sentinel failover mymaster：该命令可以**强制对****mymaster****执行故
 
 ## Redis 集群
 
-![image-20200718220229933](./image/image-20200718220229933.png)
+![image-20200718220229933](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200718220229933.png)
 
 这里要先将节点握手讲清楚。我们让两个redis节点之间进行通信的时候，需要在客户端执行下面一个命令
 
@@ -4402,7 +4402,7 @@ ziplist 是由一系列特殊编码的内存块构成的列表，可以保存字
 
 
 
-![image-20200708201423179](./image/image-20200708201423179.png)
+![image-20200708201423179](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200708201423179.png)
 
 为什么Hash与List会使用ziplist来存储数据呢？
 
@@ -4417,11 +4417,11 @@ ziplist 是由一系列特殊编码的内存块构成的列表，可以保存字
 
 ### RedisObject
 
-![image-20200708200804376](./image/image-20200708200804376.png)
+![image-20200708200804376](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200708200804376.png)
 
 ### watch
 
-![image-20200709205220653](./image/image-20200709205220653.png)
+![image-20200709205220653](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200709205220653.png)
 
 通过 `watched_keys` 字典， 如果程序想检查某个键是否被监视， 那么它只要检查字典中是否存在这个键即可； 如果程序要获取监视某个键的所有客户端， 那么只要取出键的值（一个链表）， 然后对链表进行遍历即可。
 
@@ -4468,7 +4468,7 @@ C:
 
 ## 订阅与发布模式
 
-![image-20200709211009546](./image/image-20200709211009546.png)
+![image-20200709211009546](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200709211009546.png)
 
 - 订阅信息由服务器进程维持的 `redisServer.pubsub_channels` 字典保存，字典的键为被订阅的频道，字典的值为订阅频道的所有客户端。
 - 当有新消息发送到频道时，程序遍历频道（键）所对应的（值）所有客户端，然后将消息发送到所有订阅频道的客户端上。
@@ -4543,7 +4543,7 @@ Redis 使用的过期键删除策略是**惰性删除加上定期删除**， 这
 链接：https://www.jianshu.com/p/53083f5f2ddc
 https://juejin.im/post/6844903965927145479
 
-![image-20200804213323189](./image/image-20200804213323189.png)
+![image-20200804213323189](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200804213323189.png)
 
 >  图中过期字段和键空间中键对象有重复，实际中不会出现重复对象，键空间的键和过期字典的键都指向同一个键对象
 
@@ -4700,7 +4700,7 @@ HyperLogLog 原理思路是通过给定 n 个的元素集合，记录集合中�
 
 下图来源于网络，通过给定一定数量的用户User，通过Hash得到一串Bitstring，记录其中最大连续零位的计数为4，User的不重复个数为 2 ^ 4 = 16
 
-![image-20200710215403750](./image/image-20200710215403750.png)
+![image-20200710215403750](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200710215403750.png)
 
 
 
@@ -4720,7 +4720,7 @@ Redis采用了16384个桶来存储计算HyperLogLog，那所占的内存会是�
 
 ## Sorted set(Zset)
 
-![image-20200727195050035](./image/image-20200727195050035.png)
+![image-20200727195050035](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200727195050035.png)
 
 # Rabbitmq 
 
@@ -4751,7 +4751,7 @@ RabbitMQ，是一个消息代理和队列服务器，它实现了AMQP标准协�
 
 链接：https://juejin.im/post/5dc15cdde51d4529e730696d
 
-![image-20200722221415011](./image/image-20200722221415011.png)
+![image-20200722221415011](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200722221415011.png)
 
 ## Exchange
 
@@ -4785,7 +4785,7 @@ RabbitMQ，是一个消息代理和队列服务器，它实现了AMQP标准协�
 
   
 
-![image-20200714181915190](./image/image-20200714181915190.png)
+![image-20200714181915190](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200714181915190.png)
 
 交换器负责接收来自生产者的消息，并将将消息路由到一个或者多个队列中，如果路由不到，则返回给生产者或者直接丢弃，这取决于交换器的 mandatory 属性：
 
@@ -4858,7 +4858,7 @@ Return Listener用于处理一些不可路由的消息
 
 
 
-![image-20200714183231037](./image/image-20200714183231037.png)
+![image-20200714183231037](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200714183231037.png)
 
 
 
@@ -4872,7 +4872,7 @@ Return Listener用于处理一些不可路由的消息
 
 2、消息的延迟投递, 做二次确认, 回调检查
 
-![image-20200714183622204](./image/image-20200714183622204.png)
+![image-20200714183622204](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200714183622204.png)
 
 
 
@@ -4942,7 +4942,7 @@ https://doocs.github.io/advanced-java/#/./docs/distributed-system/distributed-sy
 
 1. 一致性hash算法
 
-   ![image-20200718220126922](./image/image-20200718220126922.png)
+   ![image-20200718220126922](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200718220126922.png)
    
    
    
@@ -5214,13 +5214,13 @@ https://dev.mysql.com/doc/refman/5.7/en/xa.html
 
 
 
-![image-20200729153323255](./image/image-20200729153323255.png)
+![image-20200729153323255](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200729153323255.png)
 
 
 
 
 
-![image-20200729153809397](./image/image-20200729153809397.png)
+![image-20200729153809397](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200729153809397.png)
 
 ### 拦截器
 
@@ -5481,7 +5481,7 @@ HTML静态化的好处:
 
 ### 方案一：网页静态HTML化
 
-![image-20200728153100041](./image/image-20200728153100041.png)
+![image-20200728153100041](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200728153100041.png)
 
 上图的核心思想：
 
@@ -5521,7 +5521,7 @@ HTML静态化的好处:
 
 举个例子：我们一般访问一个文章，一般的链接地址为：http://www.xxx.com/news?id=1代表请求id为1的文章。**不过这种链接方式对SEO不是太友好（SEO对网站来说太重要了）**；所以一般进行改造：http://www.xxx.com/news/1.html 这样看上去就是个静态页面。一般我们可以**采用nginx对url进行rewrite**。小伙伴如何有兴趣可以自行了解，比较简单。
 
-![image-20200728153425035](./image/image-20200728153425035.png)
+![image-20200728153425035](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200728153425035.png)
 
 此方案的核心思想
 
@@ -5551,7 +5551,7 @@ HTML静态化的好处:
 
 针对方案二的问题，我们可以采用openresty技术方案进行，利用http模板插件lua脚本进行解决，这里老顾不会介绍openresty+lua技术，有兴趣的小伙伴，可以到访问https://www.roncoo.com/view/139 这个视频课程。
 
-![image-20200728153610722](./image/image-20200728153610722.png)
+![image-20200728153610722](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200728153610722.png)
 
 # 分布式锁
 

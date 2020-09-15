@@ -1,2068 +1,208 @@
+# tcp 进阶
 
-# 设计模式
-
-1. ### 适配器模式（Adapter模式）
-
-2. ### jdk动态代理
-
-   ```java
-   
-   	
-   	  public static void main(String[] args) throws IllegalAccessException, InstantiationException {
-   	        // 1. 创建被代理的对象，UserService接口的实现类
-   	        UserServiceImpl userServiceImpl = new UserServiceImpl();
-   	        // 2. 获取对应的 ClassLoader
-   	        ClassLoader classLoader = userServiceImpl.getClass().getClassLoader();
-   	        // 3. 获取所有接口的Class，这里的UserServiceImpl只实现了一个接口UserService，
-   	        Class[] interfaces = userServiceImpl.getClass().getInterfaces();
-   	        // 4. 创建一个将传给代理类的调用请求处理器，处理所有的代理对象上的方法调用
-   	        //     这里创建的是一个自定义的日志处理器，须传入实际的执行对象 userServiceImpl
-   	        InvocationHandler logHandler = new LogHandler(userServiceImpl);
-   	        /*
-   			   5.根据上面提供的信息，创建代理对象 在这个过程中，
-   	               a.JDK会通过根据传入的参数信息动态地在内存中创建和.class 文件等同的字节码
-   	               b.然后根据相应的字节码转换成对应的class，
-   	               c.然后调用newInstance()创建代理实例
-   			 */
-   	        UserService proxy = (UserService) Proxy.newProxyInstance(classLoader, interfaces, logHandler);
-   	        // 调用代理的方法
-   	        proxy.select();
-   	        proxy.update();
-   	    }
-   ```
-
-   
-
-   ```java
-   public class LogHandler implements InvocationHandler{
-       Object target;  // 被代理的对象，实际的方法执行者
-       public LogHandler(Object target) {
-           this.target = target;
-       }
-   	@Override
-   	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-   			before();
-   	        Object result = method.invoke(target, args);  // 调用 target 的 method 方法
-   	        after();
-   	        return result;  // 返回方法的执行结果
-   	}
-   	 // 调用invoke方法之前执行
-       private void before() {
-           System.out.println(String.format("log start time [%s] ", new Date()));
-       }
-       // 调用invoke方法之后执行
-       private void after() {
-           System.out.println(String.format("log end time [%s] ", new Date()) );
-       }
-   }
-   
-   ```
-
-   
-
-   生成的xxxxProxy 继承了 Proxy 类，并且实现了被代理的所有接口，以及equals、hashCode、toString等方法，由于 xxxProxy 继承了 Proxy 类，所以每个代理类都会关联一个 InvocationHandler 方法调用处理器
-
-   类和所有方法都被 `public final` 修饰，所以代理类只可被使用，不可以再被继承，每个方法都有一个 Method 对象来描述，Method 对象在static静态代码块中创建，以 `m + 数字` 的格式命名
-
-   ```java
-   import java.lang.reflect.InvocationHandler;
-   import java.lang.reflect.Method;
-   import java.lang.reflect.Proxy;
-   import java.lang.reflect.UndeclaredThrowableException;
-   import proxy.UserService;
-   
-   public final class UserServiceProxy extends Proxy implements UserService {
-       private static Method m1;
-       private static Method m2;
-       private static Method m4;
-       private static Method m0;
-       private static Method m3;
-   
-       public UserServiceProxy(InvocationHandler var1) throws  {
-           super(var1);
-       }
-   
-       public final boolean equals(Object var1) throws  {
-           // 省略...
-       }
-   
-       public final String toString() throws  {
-           // 省略...
-       }
-   
-       public final void select() throws  {
-           try {
-               super.h.invoke(this, m4, (Object[])null);
-           } catch (RuntimeException | Error var2) {
-               throw var2;
-           } catch (Throwable var3) {
-               throw new UndeclaredThrowableException(var3);
-           }
-       }
-   
-       public final int hashCode() throws  {
-           // 省略...
-       }
-   
-       public final void update() throws  {
-           try {
-               super.h.invoke(this, m3, (Object[])null);
-           } catch (RuntimeException | Error var2) {
-               throw var2;
-           } catch (Throwable var3) {
-               throw new UndeclaredThrowableException(var3);
-           }
-       }
-   
-       static {
-           try {
-               m1 = Class.forName("java.lang.Object").getMethod("equals", Class.forName("java.lang.Object"));
-               m2 = Class.forName("java.lang.Object").getMethod("toString");
-               m4 = Class.forName("proxy.UserService").getMethod("select");
-               m0 = Class.forName("java.lang.Object").getMethod("hashCode");
-               m3 = Class.forName("proxy.UserService").getMethod("update");
-           } catch (NoSuchMethodException var2) {
-               throw new NoSuchMethodError(var2.getMessage());
-           } catch (ClassNotFoundException var3) {
-               throw new NoClassDefFoundError(var3.getMessage());
-           }
-       }
-   }
-   
-   作者：小旋锋
-   链接：https://juejin.im/post/6844903744954433544
-   来源：掘金
-   著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处
-   ```
-
-   
-
-   调用方法的时候通过 `super.h.invoke(this, m1, (Object[])null);` 调用，其中的 `super.h.invoke` 实际上是在创建代理的时候传递给 `Proxy.newProxyInstance` 的 xxxHandler 对象，它继承 InvocationHandler 类，负责实际的调用处理逻辑。
-
-   ​      ![image-20200705231529903](./image/image-20200705231529903.png)
-
-   
-
-3. ### CGLIB动态代理
-
-   ```java
-   public class Intercepter implements MethodInterceptor{
-   	@Override
-   	public Object intercept(Object object, Method arg1, Object[] objects, MethodProxy methodProxy) throws Throwable {
-   		before();
-           Object result = methodProxy.invokeSuper(object, objects);   // 注意这里是调用 invokeSuper 而不是 invoke，否则死循环，methodProxy.invokesuper执行的是原始类的方法，method.invoke执行的是子类的方法
-           after();
-           return result;
-   	}
-   	private void before() {
-   		System.out.println(String.format("log start time [%s] ", new Date()));
-   	}
-   	private void after() {
-   		System.out.println(String.format("log end time [%s] ", new Date()));
-   	}
-   }
-   ```
-
-   ```java
-   
-   public class Client3 {
-   	public static void main(String[] args) {
-   		Intercepter proxy = new Intercepter();
-   		Enhancer enhancer = new Enhancer();
-   		enhancer.setSuperclass(UserServiceImpl.class); // 设置超类，cglib是通过继承来实现的
-   		enhancer.setCallback(proxy); //设置拦截
-   		UserService dao = (UserService) enhancer.create(); // 创建代理类
-   		dao.update();
-   		dao.select();
-   	}
-   }
-   ```
-
-   CGLIB 创建动态代理类的模式是：
-
-   1. 查找目标类上的所有非final 的public类型的方法定义；
-   2. 将这些方法的定义转换成字节码；
-   3. 将组成的字节码转换成相应的代理的class对象；
-   4. 实现 MethodInterceptor接口，用来处理对代理类上所有方法的请求
+#### 我们已经介绍了以下几种分组格式： I P、I C M P、I G M P、U D P和T C P。每一种格式的首部中均包含一个检验和。对每种分组，说明检验和包括I P数据报中的哪些部分，以及该检验和是强制的还是可选的
 
-   Diff : 
+除了UDP的检验和，其他都是必需的。IP检验和只覆盖了IP首部，而其他字段都紧接着IP首部开始。
 
-   * cglib动态代理：基于ASM机制实现，通过生成业务类的子类作为代理类。
+#### 为什么我们已经讨论的所有I n t e r n e t协议（I P, ICMP, IGMP, UDP, TCP）收到有检验和错的分组都仅作丢弃处理？
 
-   * 基于类似 cglib 框架的优势：
+源IP地址、源端口号或者协议字段可能被破坏了。
 
-     - 无需实现接口，达到代理类无侵入
+#### T C P提供了一种字节流服务，而收发双方都不保持记录的边界。应用程序如何提供它们自己的记录标识？
 
-     - 只操作我们关心的类，而不必为其他相关类增加工作量。
+很多Internet应用使用一个回车和换行来标记每个应用记录的结束。这是NVT ASCII采用的编码（26.4节）。另外一种技术是在每个记录之前加上一个记录的字节计数，DNS（习题14.4）和Sun RPC（29.2节）采用了这种技术。
 
-     - 高性能
+#### 为什么在T C P首部的开始便是源和目的的端口号？
 
-       
+就像我们在6.5节所看到的，一个ICMP差错报文必须至少返回引起差错的IP数据报中除了IP首部的前8个字节。当TCP收到一个ICMP差错报文时，它需要检查两个端口号以决定差错对应于哪个连接。因此，端口号必须包含在TCP首部的前8个字节里。
 
-   * JDK动态代理：基于Java反射机制实现，必须要实现了接口的业务类才能用这种办法生成代理对象。
+#### 为什么TCP 首部有一个首部长度字段而UDP首部中却没有？
 
-   * JDK Proxy 的优势：
+TCP首部的最后有一些选项，但UDP首部中没有选项。
 
-     - 最小化依赖关系，减少依赖意味着简化开发和维护，JDK 本身的支持，可能比 cglib 更加可靠。
-     - 平滑进行 JDK 版本升级，而字节码类库通常需要进行更新以保证在新版 Java 上能够使用。
-     - 代码实现简单。
+#### SYN 初始值 ISN 规律
 
-     
+当一端为建立连接而发送它的S Y N时，它为连接选择一个初始序号。I S N随时间而变化，因此每个连接都将具有不同的I S N。RFC 793 指出ISN可看作是一个 32 比特的计数器，每4 ms加1。这样选择序号的目的在于防止在网络中被延迟的分组在以后又被传送，而导致某个连接的一方对它作错误的解释。
 
-     
+#### 全双工的体现
 
-4. ### 描述动态代理的几种实现方式？分别说出相应的优缺点
+既然一个T C P连接是全双工（即数据在两个方向上能同时传递），因此每个方向必须单独地进行关闭。这原则就是当一方完成它的数据发送任务后就能发送一个F I N来终止这个方向连接。当一端收到一个F I N，它必须通知应用层另一端几经终止了那个方向的数据传送。发送F I N通常是应用层进行关闭的结果。收到一个F I N只意味着在这一方向上没有数据流动。一个T C P连接在收到一个F I N后仍能发送数据。而这对利用半关闭的应用来说是可能的，尽管在实际应用中只有很少的T C P应用程序这样做。
 
-   代理可以分为 "静态代理" 和 "动态代理"，动态代理又分为 "JDK动态代理" 和 "CGLIB动态代理" 实现。
+<img src="/Users/ano/Desktop/notes/image/image-20200913165533427.png" alt="image-20200913165533427" style="zoom:50%;" />
 
-   **静态代理**：代理对象和实际对象都继承了同一个接口，在代理对象中指向的是实际对象的实例，这样对外暴露的是代理对象而真正调用的是 Real Object
+#### MSS 多大？怎么确定的？
 
-   - **优点**：可以很好的保护实际对象的业务逻辑对外暴露，从而提高安全性。
-   - **缺点**：不同的接口要有不同的代理类实现，会很冗余
+它并不是任何条件下都可协商。当建立一个连接时，每一方都有用于通告它期望接收的M S S选项（M S S选项只能出现在S Y N报文段中）。如果一方不接收来自另一方的MSS值，则MSS就定为默认值536字节（这个默认值允许2 0字节的I P首部和20字节的TCP首部以适合576字节I P数据报)。
 
-   **JDK 动态代理**：
+#### time_wait 的坏处
 
-   - 为了解决静态代理中，生成大量的代理类造成的冗余；
-   - JDK 动态代理只需要实现 InvocationHandler 接口，重写 invoke 方法便可以完成代理的实现，
-   - jdk的代理是利用反射生成代理类 Proxyxx.class 代理类字节码，并生成对象
-   - jdk动态代理之所以**只能代理接口**是因为**代理类本身已经extends了Proxy，而java是不允许多重继承的**，但是允许实现多个接口
-   - **优点**：解决了静态代理中冗余的代理实现类问题。
-   - **缺点**：JDK 动态代理是基于接口设计实现的，如果没有接口，会抛异常。
+当T C P执行一个主动关闭，并发回最后一个A C K，该连接必须在T I M E_WA I T状态停留的时间为2倍的M S L。这样可让T C P再次发送最后的A C K以防这个A C K丢失（另一端超时并重发最后的F I N）。
 
-   **CGLIB 代理**：
+这种2 MSL等待的另一个结果是这个TCP连接在2 MSL等待期间，定义这个连接的插口（客户的I P地址和端口号，服务器的I P地址和端口号）不能再被使用。这个连接只能在2 MSL结束后才能再被使用。服务器通常执行被动关闭，不会进入TIME_WAIT状态。这暗示如果我们终止一个客户程序，并立即重新启动这个客户程序，则这个新客户程序将不能重用相同的本地端口。这不会带来什么问题，因为客户使用本地端口，而并不关心这个端口号是什么。然而，对于服务器，情况就有所不同，因为服务器使用熟知端口。如果我们终止一个已经建立连接的服务器程序，并试图立即重新启动这个服务器程序，服务器程序将不能把它的这个熟知端口赋值给它的端点，因为那个端口是处于2 MSL连接的一部分。在重新启动服务器程序前，它需要在1 ~ 4分钟。
 
-   - 由于 JDK 动态代理限制了只能基于接口设计，而对于没有接口的情况，JDK方式解决不了；
-   - CGLib 采用了非常底层的字节码技术，其原理是通过字节码技术为一个类创建子类，并在子类中采用方法拦截的技术拦截所有父类方法的调用，顺势织入横切逻辑，来完成动态代理的实现。
-   - 实现方式实现 MethodInterceptor 接口，重写 intercept 方法，通过 Enhancer 类的回调方法来实现。
-   - 但是CGLib在创建代理对象时所花费的时间却比JDK多得多，所以对于单例的对象，因为无需频繁创建对象，用CGLib合适，反之，使用JDK方式要更为合适一些。
-   - 同时，由于CGLib由于是采用动态创建子类的方法，对于final方法，无法进行代理。
-   - **优点**：没有接口也能实现动态代理，而且采用字节码增强技术，性能也不错。
-   - **缺点**：技术实现相对难理解些。
+#### RST 复位什么时候发出
 
-5. 
+一般说来，**无论何时一个报文段发往基准的连接（ referenced connection）出现错误， T C P都会发出一个复位报文段（这里提到的“基准的连接”是指由目的I P地址和目的端口号以及源I P地址和源端口号指明的连接。这就是为什么RFC 793称之为插口）。**
 
-6. 
+产生复位的一种常见情况是当连接请求到达时，目的端口没有进程正在听。
 
-   
+发送一个复位报文段而不是F I N来中途释放一个连接。有时称这为异常释放（abortive release）。异常终止一个连接对应用程序来说有两个优点：（1）丢弃任何待发数据并立即发送复位报文段；（2）R S T的接收方会区分另一端执行的是异常关闭还是正常关闭。应用程序使用的A P I必须提供产生异常关闭而不是正常关闭的手段，R S T报文段中包含一个序号和确认序号。需要注意的是R S T报文段不会导致另一端产生任何响应，另一端根本不进行确认。收到R S T的一方将终止该连接，并通知应用层连接复位。
 
-   
+#### TCP 选项有什么
 
-   
+<img src="/Users/ano/Desktop/notes/image/image-20200913172145109.png" alt="image-20200913172145109" style="zoom:50%;" />
 
-   
 
-# Mysql 常见问题
 
-## 第一二三范式 ：
+1. 窗口扩大选项使T C P的窗口定义从16 bit增加为32 bit。这并不是通过修改T C P首部来实现的， T C P首部仍然使用16 bit ，而是通过定义一个选项实现对16 bit 的扩大操作( s c a l i n go p e r a t i o n )来完成的。于是T C P在内部将实际的窗口大小维持为32 bit的值。
+2. 时间戳选项使发送方在每个报文段中放置一个时间戳值。接收方在确认中返回这个数值，从而允许发送方为每一个收到的A C K计算RT T（我们必须说“每一个收到的A C K”而不是“每一个报文段”，是因为T C P通常用一个A C K来确认多个报文段）。我们提到过目前许多实现为每一个窗口只计算一个RT T，对于包含8个报文段的窗口而言这是正确的。然而，较大的窗口大小则需要进行更好的RT T计算。
+3. 最大报文传输段（Maximum Segment Size ---MSS）
+4. 选择确认选项（Selective Acknowledgements --SACK）
 
-**1NF的定义为：符合1NF的关系中的每个属性都不可再分**
+#### 半打开连接和半关闭连接的区别是什么？
 
-**2NF在1NF的基础之上，消除了非主属性对于码的部分函数依赖**。
+在一个**半关闭**的连接上，一个端点已经发送了一个FIN，正等待另一端的数据或者一个FIN。
 
->  成绩表 （学号，系，课，分数）， 码 = （学号+课） 
->
-> 系只依赖学号
+一个**半打开**的连接是当一个端点崩溃了，而另一端还不知道的情况。
 
- **3NF在2NF的基础之上，消除了非主属性对于码的传递函数依赖**
+**未连接队列**：在三次握手协议中，服务器维护一个未连接队列，该队列为每个客户端的SYN包（syn=j）开设一个条目，该条目表明服务器已收到 SYN包，并向客户发出确认，正在等待客户的确认包。这些条目所标识的连接在服务器处于Syn_RECV状态，当服务器收到客户的确认包时，删除该条目， 服务器进入ESTABLISHED状态。
 
-> （学号，系，系主任）， 码 = 学号
->
-> 学号-》系-》系主任
+#### ACK延迟确认机制
 
-**BCNF再3NF 的基础上消除主属性对于码的部分与传递函数依赖。**
+接收方在收到数据后，并不会立即回复ACK，而是延迟一定时间。一般ACK延迟发送时间为200ms，但是这个200ms并非收到数据后需要延迟的时间。系统有一个固定的定时器每隔200ms会来检查是否需要发送ACK包。这样做有2个目的：
 
-> （仓库，管理员，物品，数额）
->
-> 主属性：仓库名、管理员、物品名
-> 非主属性：数量
->
-> 
+1. 这样做的目的是ACK是可以合并的，也就是指如果连续收到两个TCP包，并不一定需要ACK两次，只要回复最终的ACK就可以了，可以降低网络流量。
+2. 如果接收方有数据要发送，那么就会在发送数据的TCP数据包里，带上ACK信息。这样做，可以避免大量的ACK以一个单独的TCP包发送，减少了网络流量。
 
-https://www.zhihu.com/question/24696366
+#### SACK(Selective Acknowledgment)
 
+SACK是一个TCP的选项，来允许TCP单独确认非连续的片段，用于告知真正丢失的包，只重传丢失的片段。要使用SACK，2个设备必须同时支持SACK才可以，建立连接的时候需要使用SACK Permitted的option，如果允许，后续的传输过程中TCP segment中的可以携带SACK option，这个option内容包含**一系列的非连续的没有确认的数据的seq range**。
 
+TCP收到乱序数据后会将其放到乱序序列中，然后发送重复ACK给对端。对端如果收到多个重复的ACK，认为发生丢包，TCP会重传最后确认的包开始的后续包。这样原先已经正确传输的包，可能会重复发送，降低了TCP性能。为改善这种情况，发展出SACK技术，使用SACK选项可以告知发包方收到了哪些数据，发包方收到这些信息后就会知道哪些数据丢失，然后立即重传丢失的部分。
 
-## 索引
+<img src="/Users/ano/Desktop/notes/image/image-20200914054147523.png" alt="image-20200914054147523" style="zoom:50%;" />
 
-### 索引是啥？优缺点
+#### **SACK 重传**
 
-```
-索引是帮助MySQL高效获取数据的数据结构（有序）。
+1. 未启用 SACK 时，TCP 重复 ACK 定义为收到连续相同的 ACK seq。[RFC5681]
+2. 启用 SACK 时，携带 SACK 的 ACK 也被认为重复 ACK。[RFC6675]
 
+SACK option格式
 
+Kind 5  Length  剩下的都是没有确认的segment的range了 比如说segment 501-600 没有被确认，那么Left Edge of 1st Block = 501，Right Edge of 1st Block = 600，**TCP的选项不能超过40个字节，所以边界不能超过4组**。
 
-提高数据检索的效率，降低数据库的IO成本，同时却也降低更新表的速度，如对表进行INSERT、UPDATE、DELETE。因为更新表时，MySQL 不仅要保存数据，还要保存一下索引文件每次更新添加了索引列的字段，都会调整因为更新所带来的键值变化后的索引信息。
-```
+#### Nagle算法
 
+在局域网上，小分组（被称为微小分组（ t i n y g r a m））通常不会引起麻烦，因为局域网一般不会出现拥塞。但在广域网上，这些小分组则会增加拥塞出现的可能。
 
+该算法要求一个T C P连接上最多只能有一个未被确认的未完成的小分组，在该分组的确认到达之前不能发送其他的小分组。相反， T C P收集这些少量的分组，并在确认到来时以一个分组的方式发出去。该算法的优越之处在于它是自适应的：确认到达得越快，数据也就发送得越快。而在希望减少微小分组数目的低速广域网上，则会发送更少的分组。
 
-### 索引类型，结构
+插口API用户可以使用 **TCP_NODELAY** 选项来关闭Nagle算法。
 
-```
-https://www.jianshu.com/p/f74feb7dbdc1
+#### Karn算法
 
-- 1. BTree 索引 ： 最常见的索引类型，大部分索引都支持 BTree索引。
+当一个超时和重传发生时，在重传数据的确认最后到达之前，不能更新RT T估计器，因为我们并不知道A C K对应哪次传输（也许第一次传输被延迟而并没有被丢弃，也有可能第一次传输的A C K被延迟）并且，由于数据被重传， RTO已经得到了一个指数退避，我们在下一次传输时使用这个退避后的RTO。对一个没有被重传的报文段而言，除非收到了一个确认，否则不要计算新的RTO。
 
-  2. Hash 索引：Memory引擎支持 ， 使用场景简单 。
+K a r n算法在分组丢失时可以不测量RT T就能解决重传的二义性问题。
 
-  3. R-tree 索引（空间索引）：空间索引是MyISAM引擎的一个特殊索引类型，主要用于地理空间数据类型，通常使用较少。
+#### 快重传：3次相同的ack后会进入慢启动吗？
 
-  4. Full-text （全文索引） ：全文索引也是MyISAM的一个特殊索引类型，主要用于全文索引，InnoDB从Mysql5.6版本开始支持全文索引。
+No，在这种情况下没有执行慢启动的原因是由于收到重复的A C K不仅仅告诉我们一个分组丢失了。由于接收方只有在收到另一个报文段时才会产生重复的A C K，而该报文段已经离开了网络并进入了接收方的缓存。也就是说，在收发两端之间仍然有流动的数据，而我们不想执行慢启动来突然减少数据流。
 
-  
 
-- 1） 单值索引 ：即一个索引只包含单个列，一个表可以有多个单列索引。
-  2） 唯一索引 ：索引列的值必须唯一，但允许有空值。
-  3） 复合索引 ：即一个索引包含多个列，例如用身份证号和考生号两列作为复合索引
-  4） 主键索引,也就是在唯一索引的基础上相应的列必须为主键
-```
 
+流程
 
+1) 当收到第3个重复的A C K时，将s s t h re s h设置为当前拥塞窗口c w n d的一半。重传丢失的报文段。设置c w n d为s s t h r e s h加上3倍的报文段大小。
 
-### 什么时候建议/不建议+索引
+2) 每次收到另一个重复的A C K时， c w n d增加1个报文段大小并发送1个分组（如果新的 c w n d允许发送）。
 
-#### 索引建立原则
+3) 当下一个确认新数据的A C K到达时，设置c w n d为s s t h re s h（在第1步中设置的值）。这个A C K应该是在进行重传后的一个往返时间内对步骤1中重传的确认。另外，这个A C K也应该是对丢失的分组和收到的第1个重复的A C K之间的所有中间报文段的确认。这一步采用的是拥塞避免，因为当分组丢失时我们将当前的速率减半。
 
-```
-（1）. 尽量减少like，但不是绝对不可用，”xxxx%” 是可以用到索引的
-（2）. 表的主键、外键必须有索引
-（3）. 谁的区分度更高（同值的最少），谁建索引，区分度的公式是count(distinct（字段）)/count(*)
-（4）. 单表数据太少，不适合建索引
-（5）. where，order by ,group by 等过滤时，后面的字段最好加上索引
-（6）. 如果既有单字段索引，又有这几个字段上的联合索引，一般可以删除联合索引；
-（7）. 联合索引的建立需要进行仔细分析；尽量考虑用单字段索引代替：
-（8）. 联合索引: mysql 从左到右的使用索引中的字段，一个查询可以只使用索引中的一部份，但只能是最左侧部分。例如索引是key index(a,b,c). 可以支持 a|a,b|a,b,c 3种组合进行查找，但不支持 b,c 进行查找.当最左侧字段是常量引用时，索引就十分有效。
-（9）. 前缀索引: 有时候需要索引很长的字符列，这会让索引变得大且慢。通常可以索引开始的部分字符，这样可以大大节约索引空间，从而提高索引效率。其缺点是不能用于ORDER BY和GROUP BY操作，也不能用于覆盖索引 Covering index（即当索引本身包含查询所需全部数据时，不再访问数据文件本身）
-10）. NULL会导致索引形同虚设
-```
-#### 索引什么时候失效
+#### 保活计时器的作用？
 
-1. ```
-   1. where条件中有or，即使其中有条件带索引也不会使用；如果要想使用or又想让索引生效，只能将or条件中的每个列都加上索引；
-   2. 对于多列索引，不是使用的第一部分，则不会使用索引（即不符合最左前缀原则）；
-   3. like查询是以%开头；
-   4. 如果列类型是字符串，那一定要在条件中将数据使用引号引用起来，否则不使用索引；
-   5. 如果mysql估计使用全表扫描要比使用索引快，则不使用索引
-   ```
+TCP的Keepalive，目的在于看看对方有没有发生异常，如果有异常就及时关闭连接。当传输双方不主动关闭连接时，就算双方没有交换任何数据，连接也是一直有效的。保活定时器每隔一段时间会超时，超时后会检查连接是否空闲太久了，如果空闲的时间超过了设置时间，就会发送探测报文。然后通过对端是否响应、响应是否符合预期，来判断对端是否正常，如果不正常，就主动关闭连接，而不用等待HTTP层的关闭了。
 
+参考 ： https://blog.csdn.net/zhangskd/article/details/44177475
 
+#### SYN Cookies
 
-### 索引下推是什么  (Index Condition Pushdown) ICP
+在最常见的SYN Flood攻击中，攻击者在短时间内发送大量的TCP SYN包给受害者。受害者(服务器)为每个TCP SYN包分配一个特定的数据区，只要这些SYN包具有不同的源地址(攻击者很容易伪造)。这将给TCP服务器造成很大的系统负担，最终导致系统不能正常工作。
 
-```
-在Mysql5.6以后引入了索引下推优化，可以在索引遍历过程中对索引所包含的字段先做判断，直接过滤不满足的条件，旨在减少回表次数和减少MySQL server层和引擎层的交互次数；
-```
+SYN Cookie是对TCP服务器端的三次握手做一些修改，专门用来防范SYN Flood攻击的一种手段。它的原理是，在TCP服务器接收到TCP SYN包并返回TCP SYN + ACK包时，**不分配一个专门的数据区，而是根据这个SYN包计算出一个cookie值**。这个cookie作为将要返回的SYN ACK包的初始序列号。当客户端返回一个ACK包时，根据包头信息计算cookie，与返回的确认序列号(初始序列号 + 1)进行对比，如果相同，则是一个正常连接，然后，分配资源，建立连接。
 
+cookie的计算：服务器收到一个SYN包，计算一个消息摘要mac。
 
+#### TIME_WAIT快速回收与重用
 
-## 什么是游标/光标
+https://blog.csdn.net/dog250/article/details/13760985
 
-```
-游标是用来存储查询结果集的数据类型 , 在存储过程和函数中可以使用光标对结果集进行循环的处理
-```
+Linux实现了一个TIME_WAIT状态**快速回收**的机制，即无需等待两倍的MSL这么久的时间，而是等待一个Retrans时间即释放，也就是等待一个重传时间(一般超级短，以至于你都来不及能在netstat -ant中看到TIME_WAIT状态)随即释放。释放了之后，一个连接的tuple元素信息就都没有了。在快速释放掉TIME_WAIT连接之后，peer依然保留着。丢失的仅仅是端口信息。不过有了peer的IP地址信息以及TCP最后一次触摸它的时间戳就足够了，TCP规范给出一个优化，即一个新的连接除了同时触犯了以下几点，其它的均可以快速接入，即使它本应该处在TIME_WAIT状态(但是被即快速回收了)：
+**1.来自同一台机器的TCP连接携带时间戳；
+2.之前同一台peer机器(仅仅识别IP地址，因为连接被快速释放了，没了端口信息)的某个TCP数据在MSL秒之内到过本机；
+3.新连接的时间戳小于peer机器上次TCP到来时的时间戳，且差值大于重放窗口戳。**
 
-## 触发器是什么？
+**建议：**如果前端部署了三/四层NAT设备，尽量关闭快速回收，以免发生NAT背后真实机器由于时间戳混乱导致的SYN拒绝问题。
 
-```
-触发器是与表有关的数据库对象，指在 insert/update/delete 之前或之后，触发并执行触发器中定义的SQL语句集合。触发器的这种特性可以协助应用在数据库端确保数据的完整性 , 日志记录 , 数据校验等操作 。
-```
-
-
-
-## 存储引擎有哪些，特点是啥？InnoDB主要特性？
-
-https://blog.csdn.net/zgrgfr/article/details/74455547
-
-## innode 和MyISAM 区别
-
-* InnoDB 中不保存表的具体行数，也就是说，执行select count(*) from table时，InnoDB要扫描一遍整个表来计算有多少行，但是MyISAM只要简单的*
-* *读出保存好的行数即可。注意的是，当count(*)语句包含 where条件时，两种表的操作是一样的。
-* ***\*两种类型最主要的差别就是Innodb 支持事务处理与外键和行级锁。\****而MyISAM不支持.所以MyISAM往往就容易被人认为只适合在小项目中使用。
-* InnoDB 把数据和索引存放在表空间里面， MyISAM 表被存放在三个文件 。frm 文件存放表格定义。 数据文件是MYD (MYData) 。 索引文件是MYI (MYIndex)引伸
-* **InnoDB支持事务，MyISAM不支持，对于InnoDB每一条SQL语言都默认封装成事务，自动提交，这样会影响速度，所以最好把多条SQL语言放在begin和commit之间，组成一个事务；**
-* **InnoDB表必须有主键（用户没有指定的话会自己找或生产一个主键），而Myisam可以没有**
-
-## mysql 日志
-
-   ```
-   https://www.jianshu.com/p/db19a1d384bc
-   
-   Mysql 有4种类型的日志：Error Log、Genaral Query Log、 Binary Log 和 Slow Query Log
-   
-   Error Log 记录Mysql运行过程中的Error、Warning、Note等信息，系统出错或者某条记录出问题可以查看Error日志。
-   
-   General Query Log 记录mysql的日常日志，包括查询、修改、更新等的每条sql。
-   
-   Binary Log 二进制日志，包含一些事件，这些事件描述了数据库的改动，如建表、数据改动等，主要用于备份恢复、回滚操作等，需要配置一个server-id
-   ```
-
-   
-
-## InnoDB 重做日志(redo log) 回滚日志(undo log）是什么
-
-- ```
-  InnoDB 有两块非常重要的日志，一个是undo log，另外一个是redo log，前者用来保证事务的原子性以及InnoDB的MVCC，后者用来保证事务的持久性。
-  
-  - RedoLog
-  
-  事务将数据的变更写到内存页中同时记录到redolog里面，然后提交就算这个事务已经结束，期间只有一次磁盘IO，效率远比比事务将数据直接写到磁盘里面要高的多，并且redolog写到磁盘可以看作是顺序IO，所以redolog能提升性能的一个方面就在于将对磁盘的随机IO写转换成顺序IO；且事务因为宕机可能会丢失，redolog还有一个作用就是保证事务的持久性；
-  
-  
-  
-  
-  
-  为什么需要Redo log？
-  Innodb buffer pool内部储存的是数据页，当修改innodb表上某行数据时，如果该行不在内存中则需要将该行所在的数据页从磁盘读入到内存去，然后在内存中更新该行，现在内存中的数据页与磁盘中就不一致了，把这种内存数据页与磁盘数据页不一致的数据页称为脏页（dirty page），DB需要把脏页数据写入磁盘，但是如果每一次更新数据就会带来一次磁盘操作的话那么机器肯定撑不住；所以说mysql会把标记为脏页的数据页储存在一个flush list里面，用一个专门的后台线程定时刷脏；那么如果在mysql还没有刷脏的时候数据库挂了怎么办呢，所以就需要redo log；
-  
-  - UndoLog
-  
-  Undo log的存在保证了事务的原子性，MVCC就是依赖它来实现，当对任何行做了修改的时候都会在undo log里面记录，大量的undo log构成行的历史版本记录，在需要的时候可以回退(rollback)到任何版本；
+TW**重用** 有相关的规范，即：如果能保证以下任意一点，一个TW状态的四元组(即一个socket连接)可以重新被新到来的SYN连接使用：
 
-  
-   
-  二、不同的DML操作，UNDO BLOCK中保存的前映像内容
-  INSERT操作，UNDO中只需要保存插入记录的rowid，如果需要回退，通过保存的rowid进行删除即可（后面有案例）
-  UPDATE操作，UNDO中只需要记录被更新字段的旧值，如果需要回退，只需要通过旧值覆盖更新后的值即可。
-  DELETE操作，UNDO中必须记录整行的数据，如果需要回退，只需要将这整行的数据重新插入至表中即可。
-  
-  
-     
-  https://www.jianshu.com/p/c5a3c3a0508f   
-  ```
-  
-  ## redo log
-  
-  https://juejin.im/entry/6844903681091977229
-  
-  redo log是innodb层产生的，只记录该存储引擎中表的修改，redo log包括两部分：一是内存中的日志缓冲(redo log buffer)，该部分日志是易失性的；二是磁盘上的重做日志文件(redo log file)，该部分日志是持久的。
-  
-  
-  
-  
-  
-  在概念上，innodb通过***force log at commit\***机制实现事务的持久性，即在事务提交的时候，必须先将该事务的所有事务日志写入到磁盘上的redo log file和undo log file中进行持久化。
-  
-  
-  
-  ![image-20200822001337259](./image/image-20200822001337259.png)
-  
-  
-  
-  ### 写入机制
-  
-  `redo log`写入前是先写入到`redo log buffer`，buffer中的内容是不会持久化到磁盘中，如果写buffer的过程中异常退出了会丢失这部分日志，但是这部分的事务是没有提交的所有丢失的影响也不大；
-  
-  
-  
-  `innodb_flush_log_at_trx_commit`参数控制着redo log的写入策略：
-  
-  - 0： 表示每次事务提交时都只是把 redo log 留在 redo log buffer中，然后每秒后台线程使用fsync写入磁盘；
-  - 1：表示每次事务提交时都使用fsync将 redo log 直接持久化到磁盘；
-  - 2：表示每次事务提交时都只是把 redo log 写到 page cache中，然后每秒后台线程使用fsync写入磁盘；
-  
-  Innodb中有一个后台线程每隔1s会把redo log buffer中的日志write到文件系统的page cache中，然后使用fsync持久化到磁盘里面；
-  
-  
-  
-  ![image-20200822001604290](./image/image-20200822001604290.png)
-  
-  在主从复制结构中，要保证事务的持久性和一致性，需要对日志相关变量设置为如下：
-  
-  - **如果启用了二进制日志，则设置sync_binlog=1，即每提交一次事务同步写到磁盘中。**
-  - **总是设置innodb_flush_log_at_trx_commit=1，即每提交一次事务都写到磁盘中。**
-  
-  ==**如果MySQL宕机，而Buffer Pool的数据没有完全刷新到磁盘，就会导致数据丢失，无法保证持久性。** 因此引入Redo Log解决这个问题。==
-  
-  - 当数据修改时，首先写入Redo Log，再更新到Buffer Pool，保证数据不会因为宕机而丢失，保证持久性。
-  - 当事务提交时会调用fsync将redo log刷至磁盘持久化。MySQL宕机时，通过读取Redo Log中的数据，对数据库进行恢复。
-  
-  ==Redo Log也是记录在磁盘中，为什么会比直接将Buffer Pool写入磁盘更快？==
-  
-  - Buffer Pool刷入脏页至磁盘是随机IO，每次修改的数据位置随机，而Redo Log永远在页中追加，属于顺序IO。
-  - Buffer Pool刷入磁盘是以数据页为单位，每次都需要整页写入。而Redo Log只需要写入真正**物理修改**的部分，IO数据量大大减少。
+**1.初始序列号比TW老连接的末序列号大**
+**2.如果使能了时间戳，那么新到来的连接的时间戳比老连接的时间戳大**
 
-## undo log
+#### BBR 算法
 
-undo log有两个作用：提供回滚和多个行版本控制(MVCC)。
+BBR 全称 bottleneck bandwidth and round-trip propagation time。基于包丢失检测的 Reno、NewReno 或者 cubic 为代表，其主要问题有 Buffer bloat 和长肥管道两种。和这些算法不同，bbr 算法会时间窗口内的最大带宽 max_bw 和最小 RTT min_rtt，并以此计算发送速率和拥塞窗口。
 
-Undo Log中基于回滚指针(DB_ROLL_PT)维护数据行的所有历史版本。
+当没有足够的数据来填满管道时，RTprop 决定了流的行为；当有足够的数据填满时，那就变成了 BtlBw 来决定。这两条约束交汇在点 **inflight =BtlBw\*RTprop，也就是管道的 BDP（带宽与时延的乘积）**。当管道被填满时，那些超过的部分（inflight-BDP）就会在瓶颈链路中制造了一个队列，从而导致了 RTT 的增大。当数据继续增加直到填满了缓存时，多余的报文就会被丢弃了。拥塞就是发生在 BDP 点的右边，而拥塞控制算法就是来控制流的平均工作点离 BDP 点有多远。
 
- 
+<img src="/Users/ano/Desktop/notes/image/image-20200914054643982.png" alt="image-20200914054643982" style="zoom:50%;" />
 
-### Insert/update
+#### TCP 参数
 
-InnoDB中，undo log分为：
+**Backlog**参数：表示未连接队列的最大容纳数目。
 
-- Insert Undo Log
-- Update Undo Log
+**SYN-ACK 重传次数**：　服务器发送完SYN－ACK包，如果未收到客户确认包，服务器进行首次重传，等待一段时间仍未收到客户确认包，进行第二次重传，如果重传次数超 过系统规定的最大重传次数，系统将该连接信息从半连接队列中删除。注意，每次重传等待的时间不一定相同。
 
-1. Insert Undo Log
+**半连接存活时间**：是指半连接队列的条目存活的最长时间，也即服务从收到SYN包到确认这个报文无效的最长时间，该时间值是所有重传请求包的最长等待时间总和。有时我们也称半连接存活时间为Timeout时间、SYN_RECV存活时间。
 
-Insert Undo Log是INSERT操作产生的undo log。
+**开启SYN Cookies** ： net.ipv4.tcp_syncookies = 1
 
-INSERT操作的记录由于是该数据的第一个记录，对其他事务不可见，该Undo Log可以在事务提交后直接删除。
+**开启timewait重用**。允许将TIME-WAIT sockets重新用于新的TCP连接，默认为0 ：net.ipv4.tcp_tw_reuse = 1
 
-![image-20200822004014716](./image/image-20200822004014716.png)
+**开启TCP连接中TIME-WAIT sockets的快速回收**，默认为0，表示关闭；net.ipv4.tcp_tw_recycle = 1
 
+tw 时间 ： net.ipv4.tcp_fin_timeout 修改系統默认的 TIMEOUT 时间
 
+当keepalive起用的时候，**TCP发送keepalive消息的频度**。缺省是2小时，改为20分钟(20*60s)
+net.ipv4.tcp_keepalive_time = 1200
 
-- type_cmpl：undo的类型
-- undo_no：事务的ID
-- table_id：undo log对应的表对象 接着的部分记录了所有主键的列和值。
+参考https://blog.csdn.net/abv123456789/article/details/50236919
 
-Update Undo Log
 
-Update Undo Log记录对DELETE和UPDATE操作产生的Undo Log。
 
-Update Undo Log会提供MVCC机制，因此不能在事务提交时就删除，而是放入undo log链表，等待purge线程进行最后的删除。
 
-![image-20200822004101341](./image/image-20200822004101341.png)
 
-## binlog记录格式 ,主从复制三种方式
+# IQ
 
-```
-MySQL 主从复制有三种方式：基于SQL语句的复制（statement-based  replication，SBR），基于行的复制（row-based replication，RBR)，混合模式复制（mixed-based  replication,MBR)。对应的binlog文件的格式也有三种：STATEMENT,ROW,MIXED。
-```
+如果你是一名艾滋病患者，那么经过检测后，结果显示为阳性的概率为 99% 。如果你并 没有携带艾滋病毒，经过检测后，结果显示为阳性的概率仅为 1% 。也就是说，这种设备较为可靠， 不论你是否患有艾滋病，它基本能作出正确的判断。假如现在，用艾滋病检测试纸对自己进行一次 检测，检测结果显示是阳性，那请问你觉得自己得艾滋病的概率是多大？患艾滋病的概率是 1/10000 . 
 
+https://bayes-stat.github.io/download/largescale/%E7%96%BE%E7%97%85%E6%A3%80%E6%B5%8B%E4%B8%8E%E8%B4%9D%E5%8F%B6%E6%96%AF%E5%85%AC%E5%BC%8F.pdf
 
+> 当随机从总体中抽出一个人，利用检测试纸进行检 测，如果检测结果呈阳性，并不意味着这个人一定患病，他患病的可能性仅有 1%。
 
-## 两阶段提交 https://zhuanlan.zhihu.com/p/98778890
 
-最后，那么当我执行一条 update 语句时，redo log 和 binlog 是在什么时候被写入的呢？这就有了我们常说的「两阶段提交」：
 
-- 写入：redo log（prepare）
-- 写入：binlog
-- 写入：redo log（commit）
+# NAT
 
-为什么 redo log 要分两个阶段： prepare 和 commit ？redo log 就不能一次写入吗？
 
-我们分两种情况讨论：
 
-- 先写 redo log，再写 binlog
-- 先写 binlog，再写 redo log
+#### Linux 配置SNAT上网
 
-1、先写 redo log，再写 binlog
-
-这样会出现 redo log 写入到磁盘了，但是 binlog 还没写入磁盘，于是当发生 crash recovery 时，恢复后，主库会应用 redo log，恢复数据，但是由于没有 binlog，从库就不会同步这些数据，主库比从库“新”，造成主从不一致
-
-2、先写 binlog，再写 redo log
-
-跟上一种情况类似，很容易知道，这样会反过来，造成从库比主库“新”，也会造成主从不一致
-
-而两阶段提交，就解决这个问题，crash recovery 时：
-
-- 如果 redo log 已经 commit，那毫不犹豫的，把事务提交
-
-- 如果 redo log 处于 prepare，则去判断事务对应的 binlog 是不是完整的
-
-- - 是，则把事务提交
-  - 否，则事务回滚
-
-两阶段提交，其实是为了保证 redo log 和 binlog 的逻辑一致性。
-
-
-
-## DML 
-
-DML语句的处理过程描述
-update undotest set object_type='VIEW' where object_type='PROCEDURE';
-
-* 检查shared pool中是否存在相同的语句，如果存在，重用执行计划，执行扫描运算，如果不存在，执行硬解析生成执行计划
-    * 根据执行计划中的扫描运算，检查undotest表中的相关数据块是否存在buffer cache中，如果不存在则读取到内存中
-    * 检查数据块中符合object_type='PROCEDURE'条件的记录，如果没有符合条件的行记录，则结束语句，如果存在则进入下一步
-* 以当前模式（current）获取符合object_type='PROCEDURE'条件的数据块，准备进行更新
-    * 在回滚表空间的相应回滚段头的事务表上分配事务槽，这个动作需要记录redo日志
-* 从回滚段数据块上创建object_type='PROCEDURE'的前映像数据，这个动作也要记录redo日志
-    * 修改object_type='VIEW' ，这是DML操作的数据变更，而需要记录redo日志
-* 用户提交时，在redo日志中记录提交信息，将回滚段头上的事务表和回滚段数据块标记为非活动，清除修改数据块上的事务信息（也可能延迟清除）。同时必须确保整个事务的redo日志写到磁盘上的日志文件
-    * 注意：如果最后用户回滚了事务，oracle从回滚段中将前映像数据提取出来，覆盖被更新的数据块。这个回滚动作本身也需要产生redo日志，因此，我们要知道回滚的代价非常昂贵。
-
-## MVCC
-
-### 隐藏的列
-
-MVCC 在每行记录后面都保存着两个隐藏的列，用来存储两个版本号：
-
-- 创建版本号：创建一行数据时，将当前系统版本号作为创建版本号赋值。
-- 删除版本号：删除一行数据时，将当前系统版本号作为删除版本号赋值。如果该快照的删除版本号大于当前事务版本号表示该快照有效，否则表示该快照已经被删除了。
-
-#### REPEATABLE READ（可重复读）隔离级别下MVCC如何工作：
-
-当开始新一个事务时，该事务的版本号肯定会大于当前所有数据行快照的创建版本号，理解这一点很关键。
-
-### **1. SELECT**
-
-InnoDB会根据以下条件检查每一行记录：
-
-\1. InnoDB只查找版本早于当前事务版本的数据行，这样可以**确保事务读取的行要么是在开始事务之前已经存在要么是事务自身插入或者修改过的**，在事务开始之后才插入的行，事务不会看到。
-
-\2. 行的删除版本号要么未定义，要么大于当前事务版本号，这样可以**确保事务读取到的行在事务开始之前未被删除**，在事务开始之前就已经过期的数据行，该事务也不会看到。
-
-只有符合上述两个条件的才会被查询出来
-
-### **2. INSERT**
-
-将当前系统版本号作为数据行快照的创建版本号。
-
-### **3. DELETE**
-
-将当前系统版本号作为数据行快照的删除版本号。
-
-### 4. UPDATE
-
-将当前系统版本号作为更新前的数据行快照的删除版本号，并将当前系统版本号作为更新后的数据行快照的创建版本号。**可以理解为先执行 DELETE 后执行 INSERT**。
-
-保存这两个版本号，使大多数操作都不用加锁。使数据操作简单，性能很好，并且能保证只会读取到复合要求的行。不足之处是每行记录都需要额外的存储空间，需要做更多的行检查工作和一些额外的维护工作。
-
-
-
-**MVCC只在COMMITTED READ（读提交）和REPEATABLE READ（可重复读）两种隔离级别下工作。**
-
-可以认为MVCC是行级锁一个变种，但是他很多情况下避免了加锁操作，开销更低。虽然不同数据库的实现机制有所不同，但大都实现了非阻塞的读操作（读不用加锁，且能避免出现不可重复读和幻读），写操作也只锁定必要的行（写必须加锁，否则不同事务并发写会导致数据不一致）。
-
-- **“快照”不是全量拷贝，而是利用了数据多版本的特性，也就是MVCC**
-- **MVCC的核心在于每个事务自己维护的一个事务ID数组**
-- **可以用“等价原则”来判断数据版本的可见性**
-- **可重复读的关键，来自于“快照”**
-- **“快照”并不是在begin后就生成，而是在第一条“快照读”语句后才生成**
-
-https://www.jianshu.com/p/0d1d14ea84e6
-
-### MVCC  Mysql到底是怎么实现MVCC的？
-
-https://blog.csdn.net/chen77716/article/details/6742128
-
-Read Committed隔离级别：每次select都生成一个快照读。
-
-Read Repeatable隔离级别：开启事务后第一个select语句才是快照读的地方，而不是一开启事务就快照读。
-
-
-
-## 间隙锁(Gap Lock) 是啥
-
-```
-间隙锁是为了解决在RR(可重复读)隔离级别下出现的幻读问题，虽然RR可以保证当前事务的不受其他事务的`update、delete`的影响，但是会因为`insert`而出现幻读；只有RR隔离级别下才会有Gap锁；
-
-间隙锁和行锁合称Next-key lock(临键锁)
-
-Gap Lock和Next-key lock只是在RR隔离级别下存在的，并遵守下面几个规则
-    加锁的基本单位是Next-key lock；
-    查找过程中访问到的对象才会加锁；
-    索引上的等值查询，给唯一索引加锁的时候，Next-key lock退化成行锁；
-    索引上的等值查询，向右遍历时最后一个值不满足等值条件的时候，Next-key lock退化成间隙锁；
-
-```
-
-
-
-
-
-
-
-## 事务的隔离级别
-
-```
-**读未提交(Read uncommitted)**
- 即一个事务做出的改变还未提交就能被其他事务所看到
-
-**读提交(Read committed)**
- 即一个事务做出的改变需要提交后才能被其他事务看到
-
-**可重复读(Repeatable read)**
- 即一个事务执行的过程中看到的数据总是和这个事务启动时看到数据是一致的；
-
-**串行化(Serializable)**
- 对同一行数据，写会加写锁，读会加读锁，当读写锁出现冲突时后访问的事务会等待占用锁事务执行完成才会继续完成；
-```
-
-MVCC只会在`读提交`和`可重复读`这两个隔离级别下才会存在，读未提交是直接返回该行最新的数据，而串行化是直接采用加锁的方式避免并行访问。
-
-
-
-## MySQL的语句执行顺序
-
-开始->FROM子句->WHERE子句->GROUP BY子句->HAVING子句->ORDER BY子句->SELECT子句->LIMIT子句->最终结果 
-
-
-
-(1)from 
-
-(2) on 
-
-(3) join 
-
-(4) where 
-
-(5)group by(开始使用select中的别名，后面的语句中都可以使用)
-(6) avg,sum.... 
-(7)having 
-(8) select 
-(9) distinct 
-
-(10) order by
-(11) limit 
-————————————————
-
-1. **FORM**: 首先对from子句中的前两个表执行一个笛卡尔乘积，此时生成虚拟表 vt1（选择相对小的表做基础表） 
-
-2. **ON**: 对虚表VT1进行ON筛选，只有那些符合<join-condition>的行才会被记录在虚表VT2中。
-
-3. **JOIN**： 如果指定了OUTER JOIN（比如left join、 right  join），那么保留表中未匹配的行就会作为外部行添加到虚拟表VT2中，产生虚拟表VT3, rug  from子句中包含两个以上的表的话，那么就会对上一个join连接产生的结果VT3和下一个表重复执行步骤1~3这三个步骤，一直到处理完所有的表为止。
-
-4. **WHERE**： 对虚拟表VT3进行WHERE条件过滤。只有符合<where-condition>的记录才会被插入到虚拟表VT4中。
-
-5. **GROUP BY**: 根据group by子句中的列，对VT4中的记录进行分组操作，产生VT5.
-
-6. **CUBE | ROLLUP**: 对表VT5进行cube或者rollup操作，产生表VT6.
-
-7. **HAVING**： 对虚拟表VT6应用having过滤，只有符合<having-condition>的记录才会被 插入到虚拟表VT7中。
-
-8. **SELECT**： 执行select操作，选择指定的列，插入到虚拟表VT8中。
-
-9. **DISTINCT**： 对VT8中的记录进行去重。产生虚拟表VT9.
-
-10. **ORDER BY**: 将虚拟表VT9中的记录按照<order_by_list>进行排序操作，产生虚拟表VT10.
-
-11. **LIMIT**：取出指定行的记录，产生虚拟表VT11, 并将结果返回。
-
-    
-
-
-
-## 主从复制模式，同步异步半同步
-
-[https://zhuanlan.zhihu.com/p/50597960
-
-## 方案
-
-### mysql 分页
-
-https://www.jianshu.com/p/59a28a0a88aa
-
-###### 一、基于偏移的分页
-
-> 例如： `http://XXXXXXXlist?page=1&count=20`
->
-> **缺点：** 1、数据重复 2、数据缺失 3、效率低
->
-> 使用limit在数据量小的时候并不会有效率问题，但是当数据偏移量很大时性能会开始急剧下降，查询性能比对会在接下来提到。
->
-> 综上所述，流式分页不需要也不适合使用传统分页，而是使用一种更合适的方法：游标分页。
->
-> 所以这种分页方法 适用于 数据部经常变化的情况。或者拿到数据后做去重处理。
-
-###### 二、基于游标分页方案
-
->基于游标的分页是最有效的分页方法，应尽量使用这种方法。游标是指标记数据列表中特定项目的一个随机字符串。该项目未被删除时，游标将始终指向列表的同一部分，项目被删除时游标即失效。因此，您的应用不应存储任何旧的游标，也不能假定它们仍然有效。
->
->游标分页的连线支持以下参数：
->
->- **before**：这是指向已返回的数据页面开头的游标。
->- **after**：这是指向已返回的数据页面末尾的游标。
->- **limit**：这是每个页面返回的单独对象的数量。请注意：这是上限。如果数据列表中没有足够的剩余对象，那么返回的数量将小于这个数。为提升性能，将为某些连线的 limit 值设置上限。在调用案例中，API 将返回正确的分页链接。
->- **next**：将返回下一页数据的图谱 API 端点。如果未包含，则显示的是最后一页数据。根据分页的可见性和隐私，页面可能为空，但包含“next”分页链接。“next”链接不再出现时，应停止分页。
->- **previous**：将返回上一页数据的图谱 API 端点。如果未包含，则显示的是第一页数据。
->
->
-
-##### 三、基于时间的分页
-
->  时间分页使用指向数据列表中的特定时间的 Unix 时间戳在结果数据中导航。
->
->  基于时间的连线支持以下参数：
-
-- until：指向基于时间的数据范围末尾的 Unix 时间戳或 `strtotime`
-  数据值。
-- since：指向基于时间的数据范围开头的 Unix 时间戳或 `strtotime`
-  数据值。
-- limit：这是每个页面返回的单独对象的数量。限值 0 将不返回结果。为提升性能，将为某些连线的 `limit`值设置上限。在调用案例中，API 将返回正确的分页链接。
-- next：将返回下一页数据的图谱 API 端点。
-- previous：将返回上一页数据的图谱 API 端点。
-
-![image-20200706190650629](./image/image-20200706190650629.png)
-
-
-
-https://juejin.im/entry/5b5eb7f2e51d4519700f7d3c
-
-## 分页
-
-```sql
-SELECT 查询列表 FROM 表名 WHERE 筛选条件
-GROUP BY 分组条件 HAVING 分组后筛选
-ORDER BY 排序列表
-LIMIT 起始索引，显示的条目数
-```
-
-要显示的是第p页，每页显示s条数据， 则limit后参数为(p-1)*s
-
-
-
-## 优化分页查询
-
-**优化思路一**
-在索引上完成排序分页操作，最后根据主键关联回原表查询所需要的其他列内容。
-
-**优化思路二**
-该方案适用于主键自增的表，可以把Limit 查询转换成某个位置的查询 。
-
-```sql
-SELECT * FROM tb_user_1 WHERE id> 900000 LIMIT 10;
-相当于
-SELECT * FROM tb_user_1 WHERE id BETWEEN 900001 AND 900010;
-```
-
-
-
-## 视图作用
-
-```
-是一种虚拟存在的表，行和列的数据来自定义视图的查询中使用的表，并且是在使用视图时动态生成的，只保存了sql逻辑，不保存查询结果。
-实现了sql语句的重用
-简化了复杂的sql操作，不必知道其细节
-保护数据，提高安全性
-```
-
-不可更新的视图
-
-- 包含以下关键字: 分组函数,DISTINCT,GROUP BY,HAVING,UNION,UNION ALL
-
-- 常量视图，例: 
-
-  ```sql
-  CREATE VIEW v AS SELECT 'abc' NAME;
-  ```
-
-- SELECT 中包含子查询，例: 	
-
-  ```sql
-  CREATE VIEW v AS SELECT(SELECT 1) AS number;
-  ```
-
-- JOIN，例: 
-
-  ```sql
-  CREATE VIEW v AS 
-  SELECT * FROM employees e JOIN departments d
-  ON e.department_id=d.department_id;
-  ```
-
-- FROM 一个不能更新的视图，例：
-
-  ```sql
-  CREATE VIEW v2 AS 
-  SELECT * FROM v;
-  ```
-
-- WHERE 子句的子查询引用了 FROM 子句中的表，例：
-
-  ```sql
-  CREATE VIEW v AS 
-  SELECT * FROM employees
-  WHERE employees_id IN (SELECT DISTINCT manager_id FROM employees);
-  ```
-
-
-
-## MYSQL优化
-
-写日志的操作是磁盘上一小块区域内的顺序I/O，而不像随机I/O需要在磁盘的多个地方移动磁头，所以采用事务日志的方式相对来说要快得多
-
-### undo log ： https://blog.csdn.net/harryptter/article/details/87388164
-
-**插入**: 但通过事务**插入**新的数据时候，数据行版本号（DB_TRX_ID）为当前事务版本号，删除版本号设置为NULL。
-
-**删除**：在删除版本号增加当前系统全局事务ID号
-
-**修改** : 先做命中的数据行的复制,然后间原行数据的删除版本号设置为当前全局事务ID，新的行数据的数据行版本号也设置为当前全局事务ID，删除版本号为NULL
-
-**查找** ：1.寻找数据行版本号小于或者等于当前全局事务ID（这样可以确认事务读取的行在开始前已经存在，或者是事务自身插入或者修改的），2.查找删除版本号为NULL，或者大于当前事务版本号的ID（即确保读取出来的行在此事务开启之前没有被删除）
-
-## JDBC 流程
-
-（1）导入相应的jar包
-（2）加载、注册sql驱动
-（3）获取Connection连接对象
-（4）创建Statement对象并执行SQL语句
-（5）使用ResultSet对象获取查询结果集
-（6）依次关闭ResultSet、Statement、Connection对象
-
-```java
-public class JDBCUtils {
-    //获取数据库连接
-    public static Connection getConnection() throws Exception {
-        //读取配置文件信息
-        InputStream in = ClassLoader.getSystemClassLoader().getResourceAsStream("jdbc.properties");
-        Properties properties=new Properties();
-        properties.load(in);
-        String driver = properties.getProperty("driver");
-        String url = properties.getProperty("url");
-        String user = properties.getProperty("user");
-        String password = properties.getProperty("password");
-        //注册驱动
-        Class.forName(driver);
-        //获取数据库连接
-        return DriverManager.getConnection(url, user, password);
-    }
-```
-
-```java
-//通用的增删改操作
-    public void commonUpdate(String sql,Object...args){
-        Connection connect=null;
-        PreparedStatement ps=null;
-        try{
-            connect = JDBCUtils.getConnection();
-            ps = connect.prepareStatement(sql);
-            for(int i=0;i<args.length;i++){
-                ps.setObject(i+1,args[i]);//数据库中索引从1开始
-            }
-            ps.execute();//返回值true代表查询 false代表增删改
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            JDBCUtils.closeConnection(connect,ps);
-        }
-    }
-```
-
-```java
-//通用查询操作
-    @Test
-    public <T>List<T> query(Class<T> clazz,String sql,Object...args){
-        Connection connect=null;
-        PreparedStatement ps=null;
-        ResultSet rs=null;
-        List<T> result=new ArrayList<>();
-        try{
-            connect = JDBCUtils.getConnection();
-            ps = connect.prepareStatement(sql);
-            for(int i=0;i<args.length;i++){
-                ps.setObject(i+1,args[i]);
-            }
-            ResultSet resultSet = ps.executeQuery();
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            while (resultSet.next()){
-                T t=clazz.newInstance();
-               for(int i=0;i<columnCount;i++){
-                   Object value = resultSet.getObject(i + 1);
-                   String columnName = metaData.getColumnLabel(i + 1);
-                   Field field = clazz.getDeclaredField(columnName);
-                   field.setAccessible(true);
-                   field.set(t,value);
-               }
-               result.add(t);
-            }
-            return result;
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-            JDBCUtils.closeConnection(connect,ps,rs);
-        }
-        return null;
-    }
-```
-
-
-
--  PreparedStatement 和Statement的区别
-
-> - PreparedStatement代码的可读性和可维护性更强
->
-> - PreparedStatement 能实现更高效的批量操作
->
->   - DBServer会对预编译语句提供性能优化。因为预编译语句有可能被重复调用，所以语句在被DBServer的编译器编译后的执行代码被缓存下来，那么下次调用时只要是相同的预编译语句就不需要编译，只要将参数直接传入编译过的语句执行代码中就会得到执行。
->   - 在statement语句中,每执行一次都要对传入的语句编译一次。
->
-> - PreparedStatement 可以防止 SQL 注入
->
-> - PreparedStatement  可操作Blob类数据
->
->   
-
-- Java与SQL对应数据类型转换表
-
-| Java类型           | SQL类型                  |
-| ------------------ | ------------------------ |
-| boolean            | BIT                      |
-| byte               | TINYINT                  |
-| short              | SMALLINT                 |
-| int                | INTEGER                  |
-| long               | BIGINT                   |
-| String             | CHAR,VARCHAR,LONGVARCHAR |
-| byte   array       | BINARY  ,    VAR BINARY  |
-| java.sql.Date      | DATE                     |
-| java.sql.Time      | TIME                     |
-| java.sql.Timestamp | TIMESTAMP                |
-
-###  ResultSet
-
-> - PreparedStatement 的 `executeQuery() `方法，查询结果是一个ResultSet 对象
-> - ResultSet 对象以逻辑表格的形式封装了执行数据库操作的结果集，ResultSet 接口由数据库厂商提供实现
-> - ResultSet 返回的实际上就是一张数据表，有一个指针指向数据表的第一条记录的前面。
-> - ResultSet 对象维护了一个指向当前数据行的**游标**，初始的时候，游标在第一行之前，可以通过 ResultSet 对象的` next() `方法移动到下一行。调用 next()方法检测下一行是否存在。若存在，该方法返回
->   true，且指针下移，相当于Iterator对象的 `hasNext()` 和 `next() `方法的结合体。
-> - 可以通过调用 getXxx()获取每一列的值。
-
-   **注：Java与数据库交互涉及到的相关Java API中的索引都从1开始。**
-
-### ResultSetMetaData
-
-> - 可用于获取关于 ResultSet 对象中列的类型和属性信息的对象
-> - 通过调用ResultSet对象的`getMetaData()`方法获得ResultSetMetaData对象
->   - **getColumnName**(int column)：获取指定列的名称
->   - **getColumnLabel**(int column)：获取指定列的别名
->   - **getColumnCount**()：返回当前 ResultSet 对象中的列数。
-
-### 资源的释放
-
-> - 释放ResultSet, Statement,Connection。
-> - 数据库连接（Connection）是非常稀有的资源，用完后必须马上释放，如果Connection不能及时正确的关闭将导致系统问题。Connection的使用原则是**尽量晚创建，尽量早的释放。**
-> - 可以在finally中关闭，保证及时其他代码出现异常，资源也一定能被关闭。
-
-### JDBC API小结
-
-- 两种思想
-
->   - 面向接口编程的思想
->   - ORM思想(object relational mapping)
->     - 一个数据表对应一个java类
->     - 表中的一条记录对应java类的一个对象
->     - 表中的一个字段对应java类的一个属性
-
-- 两种技术
-
->   - JDBC结果集的元数据：ResultSetMetaData
->
->     - 获取列数：getColumnCount()
->     - 获取列的别名：getColumnLabel()
->
->   - 通过反射，创建指定类的对象，获取指定的属性并赋值
->
->     
-
-在jdbc中有3种执行sql的语句分别是execute，executeQuery和executeUpdate
-
-> execute执行增删改查操作
->
-> execute返回的结果是个boolean型，当返回的是true的时候，表明有ResultSet结果集，通常是执行了select操作，当返回的是false时，通常是执行了insert、update、delete等操作。execute通常用于执行不明确的sql语句。
->
-> 
->
-> executeQuery执行查询操作
->
-> executeQuery返回的是ResultSet结果集，通常是执行了select操作。
->
-> 
->
-> executeUpdate执行增删改操作
->
-> executeUpdate返回的是int型，表明受影响的行数，通常是执行了insert、update、delete等操作。
-
-
-
-
-## mysql 死锁，**什么情况下会造成死锁**？
-
-
-
-## 如果在创建表时没有显式地定义主键,则InnoDB存储引擎会按如下方式选择或创建主键？
-
-> 如果表没有主键，甚至都没有唯一键索引的话，InnoDB内部会基于一个包含了ROW_ID值的列生成一个隐式的聚簇索引，行都会根据这个ROW_ID排序。ROW_ID是一个6个字节，即48位的单调递增字段。有新数据插入时，就会生成一个新的递增的ROW_ID。所以，根据ROW_ID排序的行，本质上是按照插入顺序排序。
-
-需要说明的是，这个单调递增的ROW_ID，和我们平时申明主键时指定AUTO_INREMENT的实现逻辑是**完全不一样**的。
-
-- 隐式ROW_ID实现
-
-这个在既没有主键，也没有一个非空唯一键的InnoDB表中自动添加的被称为ROW_ID的列，既不能被任何查询访问，也不能被内部（例如基于行的复制）使用。
-
-、、、
-
-##  MySQL主从复制原理的是啥？
-
-
-
-https://blog.csdn.net/jaryle/article/details/52002727
-
-MySQL里有一个概念，叫binlog日志，就是每个增删改类的操作，会改变数据的操作，除了更新数据以外，对这个增删改操作还会写入一个日志文件，记录这个操作的日志。
-
-主库将变更写binlog日志，然后从库连接到主库之后，从库有一个IO线程，将主库的binlog日志拷贝到自己本地，写入一个中继日志中。接着从库中有一个SQL线程会从中继日志读取binlog，然后执行binlog日志中的内容，也就是在自己本地再次执行一遍SQL，这样就可以保证自己跟主库的数据是一样的。
-
-这里有一个非常重要的一点，就是从库同步主库数据的过程是串行化的，也就是说主库上并行的操作，在从库上会串行执行。所以这就是一个非常重要的点了，由于从库从主库拷贝日志以及串行执行SQL的特点，在高并发场景下，从库的数据一定会比主库慢一些，是有延时的。所以经常出现，刚写入主库的数据可能是读不到的，要过几十毫秒，甚至几百毫秒才能读取到。而且这里还有另外一个问题，就是如果主库突然宕机，然后恰好数据还没同步到从库，那么有些数据可能在从库上是没有的，有些数据可能就丢失了。
-
-所以mysql实际上在这一块有两个机制，一个是**半同步复制**，用来解决主库数据丢失问题；一个是**并行复制**，用来解决主从同步延时问题。
-
-这个所谓半同步复制，semi-sync复制，指的就是主库写入binlog日志之后，就会将强制此时立即将数据同步到从库，从库将日志写入自己本地的relay log之后，接着会返回一个ack给主库，主库接收到至少一个从库的ack之后才会认为写操作完成了。
-
-所谓并行复制，指的是从库开启多个线程，并行读取relay log中不同库的日志，然后并行重放不同库的日志，这是库级别的并行。
-
-- 主从复制的原理
-- 主从延迟问题产生的原因
-- 主从复制的数据丢失问题，以及半同步复制的原理
-- 并行复制的原理，多库并发重放relay日志，缓解主从延迟问题
-
-![image-20200730005610522](./image/image-20200730005610522.png)
-
-
-
-**半同步模式(mysql semi-sync)**
-这种模式下主节点只需要接收到**其中一台**从节点的返回信息，就会commit；否则需要等待直到超时时间然后切换成异步模式再提交；这样做的目的可以使主从数据库的数据延迟缩小，可以提高数据安全性，确保了事务提交后，binlog至少传输到了一个从节点上，不能保证从节点将此事务更新到db中。性能上会有一定的降低，响应时间会变长。如下图所示：
-
-![img](https://pic3.zhimg.com/80/v2-d9ac9c5493d1d772f5bf57ede089f0d5_1440w.jpg)
-
-
-
-**l 全同步模式**
-全同步模式是指主节点和从节点全部执行了commit并确认才会向客户端返回成功。
-
-l Statement-base Replication (SBR)就是记录sql语句在bin log中，Mysql 5.1.4 及之前的版本都是使用的这种复制格式。优点是只需要记录会修改数据的sql语句到binlog中，减少了binlog日质量，节约I/O，提高性能。缺点是在某些情况下，会导致主从节点中数据不一致（比如sleep(),now()等）。
-
-
-l Row-based Relication(RBR)是mysql master将SQL语句分解为基于Row更改的语句并记录在bin log中，也就是只记录哪条数据被修改了，修改成什么样。优点是不会出现某些特定情况下的**存储过程、或者函数、或者trigger的调用或者触发无法被正确复制的问题**。缺点是会产生大量的日志，尤其是修改table的时候会让日志暴增,同时增加bin log同步时间。也不能通过bin log解析获取执行过的sql语句，只能看到发生的data变更。
-
-l Mixed-format Replication(MBR)，MySQL NDB cluster 7.3 和7.4 使用的MBR。是以上两种模式的混合，对于一般的复制使用STATEMENT模式保存到binlog，对于STATEMENT模式无法复制的操作则使用ROW模式来保存，MySQL会根据执行的SQL语句选择日志保存方式。
-
-## InnoDB结构
-
-InnoDB存储引擎由内存池和一些后台线程组成，其各自主要的工作是：
-
-**内存池主要工作**
-
-- 维护所有进程/线程需要访问的多个内部数据结构
-
-- 缓存磁盘上的数据，方便快速读取，同时在对磁盘文件修改之前进行缓存
-
-- 缓存重做日志（redo log）
-
-  ![image-20200731135311965](./image/image-20200731135311965.png)
-
- **缓冲池**
-InnoDB缓冲池是为了通过内存的速度来弥补磁盘速度慢对数据库性能造成的影响。其工作方式总是将数据库文件按页（每页16K）读取到缓冲池，然后按最近最少使用（LRU）的算法来保留在缓冲池中的缓存数据。在数据库中进行读操作时，首先将从磁盘读到的页存放在缓冲池中，下一次读取相同的页时，首先判定是否存在缓冲池中，如果有就是被命中直接读取，没有的话就从磁盘中读取。在数据库进行改操作时，首先修改缓冲池中的页（修改后，该页即为脏页），然后在以一定的频率刷新到磁盘上。这里的刷新机制不是每页在发生变更时触发。而是通过一种checkpoint机制刷新到磁盘的。
-所以缓冲池的大小直接影响着数据库的整体性能，可以通过配置参数innodb_buffer_pool_size来设置。
-从架构图中可以看出缓冲池中缓存的数据页类型有:索引页、数据页、 undo 页、插入缓冲、自适应哈希索引、 InnoDB 的锁信息、数据字典信息等。索引页和数据页占缓冲池的很大一部分。
-
-- 数据页和索引页: Page是Innodb存储的最基本结构，也是Innodb磁盘管理的最小单位，与数据库相关的所有内容都存储在Page结构里。Page分为几种类型，数据页和索引页就是其中最为重要的两种类型。
-- 插入缓存: 在InnoDB引擎上进行插入操作时，一般需要按照主键顺序进行插入，这样才能获得较高的插入性能。当一张表中存在非聚簇的且不唯一的索引时，在插入时，数据页的存放还是按照主键进行顺序存放，但是对于非聚簇索引叶节点的插入不再是顺序的了，这时就需要离散的访问非聚簇索引页，由于随机读取的存在导致插入操作性能下降。
-  InnoDB为此设计了Insert Buffer来进行插入优化。对于非聚簇索引的插入或者更新操作，不是每一次都直接插入到索引页中，而是先判断插入的非聚集索引是否在缓冲池中，若在，则直接插入；若不在，则先放入到一个Insert Buffer中。看似数据库这个非聚集的索引已经查到叶节点，而实际没有，这时存放在另外一个位置。然后再以一定的频率和情况进行Insert Buffer和非聚簇索引页子节点的合并操作。这时通常能够将多个插入合并到一个操作中，这样就大大提高了对于非聚簇索引的插入性能。
-- 自适应哈希索引: InnoDB会根据访问的频率和模式，为热点页建立哈希索引，来提高查询效率。InnoDB存储引擎会监控对表上各个索引页的查询，如果观察到建立哈希索引可以带来速度上的提升，则建立哈希索引，所以叫做自适应哈希索引。
-  自适应哈希索引是通过缓冲池的B+树页构建而来，因此建立速度很快，而且不需要对整张数据表建立哈希索引。其 有一个要求，即对这个页的连续访问模式必须是一样的，也就是说其查询的条件(WHERE)必须完全一样，而且必须是连续的。
-- 锁信息 : nnoDB存储引擎会在行级别上对表数据进行上锁。不过InnoDB也会在数据库内部其他很多地方使用锁，从而允许对多种不同资源提供并发访问。数据库系统使用锁是为了支持对共享资源进行并发访问，提供数据的完整性和一致性。关于锁的具体知识我们之后再进行详细学习。
-- 数据字典信息 : InnoDB有自己的表缓存，可以称为表定义缓存或者数据字典。当InnoDB打开一张表，就增加一个对应的对象到数据字典。
-  数据字典是对数据库中的数据、库对象、表对象等的元信息的集合。在MySQL中，数据字典信息内容就包括表结构、数据库名或表名、字段的数据类型、视图、索引、表字段信息、存储过程、触发器等内容。MySQL INFORMATION_SCHEMA库提供了对数据局元数据、统计信息、以及有关MySQL server的访问信息（例如：数据库名或表名，字段的数据类型和访问权限等）。该库中保存的信息也可以称为MySQL的数据字典。
-
-**重做日志冲池**
-
-InnoDB有buffer pool（简称bp）。bp是数据库页面的缓存，对InnoDB的任何修改操作都会首先在bp的page上进行，然后这样的页面将被标记为dirty并被放到专门的flush list上，后续将由master thread或专门的刷脏线程阶段性的将这些页面写入磁盘（disk or ssd）。这样的好处是避免每次写操作都操作磁盘导致大量的随机IO，阶段性的刷脏可以将多次对页面的修改merge成一次IO操作，同时异步写入也降低了访问的时延。然而，如果在dirty page还未刷入磁盘时，server非正常关闭，这些修改操作将会丢失，如果写入操作正在进行，甚至会由于损坏数据文件导致数据库不可用。为了避免上述问题的发生，Innodb将所有对页面的修改操作写入一个专门的文件，并在数据库启动时从此文件进行恢复操作，这个文件就是redo log file。这样的技术推迟了bp页面的刷新，从而提升了数据库的吞吐，有效的降低了访问时延。带来的问题是额外的写redo log操作的开销（顺序IO，当然很快），以及数据库启动时恢复操作所需的时间。
-
-redo日志由两部分构成：redo log buffer、redo log file。innodb是支持事务的存储引擎，在事务提交时，必须先将该事务的所有日志写入到redo日志文件中，待事务的commit操作完成才算整个事务操作完成。在每次将redo log buffer写入redo log file后，都需要调用一次fsync操作，因为重做日志缓冲只是把内容先写入操作系统的缓冲系统中，并没有确保直接写入到磁盘上，所以必须进行一次fsync操作。因此，磁盘的性能在一定程度上也决定了事务提交的性能。
-
-InnoDB 存储引擎先将重做日志信息放入这个缓冲区,然后以一定频率将其刷新到重做日志文件。重做日志文件一般不需要设置得很大,因为在下列三种情况下重做日志缓冲中的内容会刷新到磁盘的重做日志文件中。
-
-- Master Thread 每一秒将重做日志缓冲刷新到重做日志文件
-- 每个事物提交时会将重做日志缓冲刷新到重做日志文件
-- 当重做日志缓冲剩余空间小于1/2时,重做日志缓冲刷新到重做日志文件
-
-**额外的缓冲池**
-在 InnoDB 存储引擎中，对一些数据结构本身的内存进行分配时，需要从额外的内存池中进行申请。例如: 分配了缓冲池,但是每个缓冲池中的帧缓冲还有对应的缓冲控制对象，这些对象记录以一些诸如 LRU, 锁,等待等信息,而这个对象的内存需要从额外的内存池中申请。
-
-**后台线程主要工作**
-
-- 刷新内存池中的数据，保证缓冲池中缓存的数据最新
-- 将已修改数据文件刷新到磁盘文件
-- 保证数据库异常时InnoDB能恢复到正常运行状态
-- ![image-20200731140027071](./image/image-20200731140027071.png)
-
-
-
-核心的后台线程，主要负责将缓冲池中的数据异步刷新到磁盘，保证数据的一致性，包括脏页的刷新、合并插入缓冲、undo页的回收等。
-Master thread在主循环中，分两大部分操作，每秒钟的操作和每10秒钟的操作：
-
-- **每秒一次的操作**
-
-- - 日志缓冲刷新到磁盘: 即使这个事务还没有提交（总是），这点解释了为什么再大的事务commit时都很快；
-  - 合并插入缓冲（可能）: 合并插入并不是每秒都发生，InnoDB会判断当前一秒内发生的IO次数是否小于5，如果是，则系统认为当前的IO压力很小，可以执行合并插入缓冲的操作。
-  - 至多刷新100个InnoDB的缓冲池的脏页到磁盘（可能) : 这个刷新100个脏页也不是每秒都在做，InnoDB引擎通过判断当前缓冲池中脏页的比例(buf_get_modified_ratio_pct)是否超过了配置文件中innodb_max_drity_pages_pct参数(默认是90，即90%)，如果超过了这个阈值，InnoDB引擎认为需要做磁盘同步操作，将100个脏页写入磁盘。
-
-- **每10秒一次的操作**
-
-- - 刷新100个脏页到磁盘（可能）: InnoDB引擎先判断过去10秒内磁盘的IO操作是否小于200次，如果是，认为当前磁盘有足够的IO操作能力，即将100个脏页刷新到磁盘。
-  - 合并至多5个插入缓冲（总是）: 此次的合并插入缓冲操作总会执行，不同于每秒操作时可能发生的合并操作。
-  - 将日志缓冲刷新到磁盘（总是）: InnoDB引擎会再次执行日志缓冲刷新到磁盘的操作，与每秒发生的操作一样。
-  - 删除无用的undo页（总是）: 当对表执行update，delete操作时，原先的行会被标记为删除，但是为了一致性读的关系，需保留这些行版本的信息，在进行10S一次的删除操作时，InnoDB引擎会判断当前事务系统中已被删除的行是否可以删除，如果可以，InnoDB会立即将其删除。InnoDB每次最多删除20个Undo页。
-  - 产生一个检查点（checkpoing）；
-
-
-
-**IO threads**
-在 InnoDB 存储引擎中大量使用了异步 IO 来处理写 IO 请求，IO Thread 的工作主要是负责这些 IO 请求的回调.。分别为write、read、insert buffer和log IO thread。线程数量可以通过参数进行调整。5.6以后的版本可以通过innodb_write_io_threads和innodb_read_io_threads来限制读写线程，而在5.6版本以前，只有一个参数innodb_file_io_threads来控制读写总线程数。
-
-**purge threads**
-负责回收已经使用并分配的undo页，purge操作默认是由master thread中完成的，为了减轻master thread的工作，提高cpu使用率以及提升存储引擎的性能。用户可以在参数文件中添加如下命令来启动独立的purge thread。
-innodb_purge_threads=1
-从innodb1.2版本开始，可以指定多个innodb_purge_threads来进一步加快和提高undo回收速度。
-
-**page cleaner threads**
-Page Cleaner Thread是在InnoDB1.2.X版本中引入的。其作用是将之前版本中脏页的刷新操作都放入到单独的线程中来完成。 其目的是减轻master thread的工作以及对于用户查询线程的阻塞，进一步提高InnoDB存储引擎的性能。
-
-## 三、InnoDB重要特性
-
-MySQL InnoDB通过如下重要特性实现了更好的新能和更高的特性
-
-- 插入缓冲（insert buffer）
-- 两次写（Double write）
-- 自适应哈希索引（adaptive hash index）
-- 异步io（Async IO）
-- 刷新领接页（Flush Neighbor Page）
-
-# MYBATIS
-
-https://juejin.im/entry/59127ad4da2f6000536f64d8
-
-
-
-# JVM
-
-### 内存区域划分 8
-
-#### Q1：运行时数据区是什么？
-
-虚拟机在执行 Java 程序的过程中会把它所管理的内存划分为若干不同的数据区，这些区域有各自的用途、创建和销毁时间。
-
-线程私有：程序计数器、Java 虚拟机栈、本地方法栈。
-
-线程共享：Java 堆、方法区。
-
-------
-
-#### Q2：程序计数器是什么？
-
-**程序计数器**是一块较小的内存空间，可以看作当前线程所执行字节码的行号指示器。字节码解释器工作时通过改变计数器的值选取下一条执行指令。分支、循环、跳转、线程恢复等功能都需要依赖计数器完成。是唯一在虚拟机规范中没有规定内存溢出情况的区域。
-
-如果线程正在执行 Java 方法，计数器记录正在执行的虚拟机字节码指令地址。如果是本地方法，计数器值为 Undefined。
-
-```java
-public class Test {
-    private void run() {
-        List<String> list = new ArrayList<>(); // invokespecial 构造器调用
-        list.add("a"); // invokeinterface 接口调用 
-        ArrayList<String> arrayList = new ArrayList<>(); // invokespecial 构造器调用
-        arrayList.add("b"); // invokevirtual 虚函数调用
-    }
-    public static void main(String[] args) {
-        Test test = new Test(); // invokespecial 构造器调用
-        test.run(); // invokespecial 私有函数调用
-    }
-}
-————————————————
-版权声明：本文为CSDN博主「TellH」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
-原文链接：https://blog.csdn.net/TellH/java/article/details/77370223
-```
-
-垃圾回收
-
-4种算法： 
-
-好多垃圾回收器
-
-方法区
-
-![image-20200809220615632](./image/image-20200809220615632.png)
-
-
-
-![image-20200809220822476](./image/image-20200809220822476.png)
-
-
-
-![image-20200809220839717](./image/image-20200809220839717.png)
-
-JVM 深入了解java 虚拟机 Page 39 -- 49 jvm结构
-
-![image-20200809170725658](./image/image-20200809170725658.png)
-
-![image-20200809170812538](./image/image-20200809170812538.png)
-
-# JAVA 
-
-1. ### Synchronized同步静态方法和非静态方法？
-
-   **Synchronized修饰非静态方法，实际上是对调用该方法的对象加锁，俗称“对象锁”。**
-
-   **Synchronized修饰静态方法，实际上是对该类对象加锁，俗称“类锁”。**
-
-   
-
-       1.对象锁钥匙只能有一把才能互斥，才能保证共享变量的唯一性
-       
-       2.在静态方法上的锁，和 实例方法上的锁，默认不是同样的，如果同步需要制定两把锁一样。
-       
-       3.关于同一个类的方法上的锁，来自于调用该方法的对象，如果调用该方法的对象是相同的，那么锁必然相同，否则就不相同。比如 new A().x() 和 new A().x(),对象不同，锁不同，如果A的单利的，就能互斥。
-       
-       4.静态方法加锁，能和所有其他静态方法加锁的 进行互斥
-       
-       5.静态方法加锁，和xx.class 锁效果一样，直接属于类的
-   
-2. ## JAVA 中有以下几个『元注解』：
-
-   - @Target：注解的作用目标
-   
-     ElementType.TYPE：允许被修饰的注解作用在类、接口和枚举上
-   
-     ElementType.FIELD：允许作用在属性字段上
-   
-     ElementType.METHOD：允许作用在方法上
-   
-     ElementType.PARAMETER：允许作用在方法参数上
-   
-     ElementType.CONSTRUCTOR：允许作用在构造器上
-   
-     ElementType.LOCAL_VARIABLE：允许作用在本地局部变量上
-   
-     ElementType.ANNOTATION_TYPE：允许作用在注解上
-   
-     ElementType.PACKAGE：允许作用在包上
-   
-     
-   
-   - @Retention：注解的生命周期
-   
-     RetentionPolicy.SOURCE：当前注解编译期可见，不会写入 class 文件
-   
-     RetentionPolicy.CLASS：类加载阶段丢弃，会写入 class 文件
-   
-     RetentionPolicy.RUNTIME：永久保存，可以反射获取
-   
-     ​	
-   
-   - @Documented：注解是否应当被包含在 JavaDoc 文档中
-   
-   - @Inherited：是否允许子类继承该注解
-   
-3. ## ConcurrentHashMap put 方法
-
-   1. 检查key ， value是否为null ， null 直接抛出异常
-   2. 计算hashcode，
-   3. 检查数组是否初始化，没有就调用initTable
-   4. 检查table【0】 是否为null， null 则直接用 cas 设置为new Node（k，v）
-   5. 如果当前位置的 `hashcode == MOVED == -1`,则需要进行扩容。
-   6. 如果都不满足，则利用 synchronized 锁写入数据
-   7. 如果数量大于 `TREEIFY_THRESHOLD` 则要转换为红黑树。
-   
-   
-   
-4. ## get 方法
-
-   - 根据计算出来的 hashcode 寻址，如果就在桶上那么直接返回值。
-   - 如果是红黑树那就按照树的方式获取值。
-   - 就不满足那就按照链表的方式遍历获取值。
-   -  *//hash值为负值表示正在扩容，这个时候查的是ForwardingNode的find方法来定位到nextTable来*        *//eh=-1，说明该节点是一个ForwardingNode，正在迁移，此时调用ForwardingNode的find方法去nextTable里找。*        *//eh=-2，说明该节点是一个TreeBin，此时调用TreeBin的find方法遍历红黑树，由于红黑树有可能正在旋转变色，所以find里会有读写锁。*        *//eh>=0，说明该节点下挂的是一个链表，直接遍历该链表即可。*
-
-5. ## 多态的原理
-
-   多态允许具体访问时实现方法的动态绑定。Java对于动态绑定的实现主要依赖于方法表，通过继承和接口的多态实现有所不同。
-
-   
-
-# JUC
-
-# AQS
-
-https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html
-
-何时出队列？”和“如何出队列？
-
-```java
-// java.util.concurrent.locks.AbstractQueuedSynchronizer
-
-final boolean acquireQueued(final Node node, int arg) {
-	// 标记是否成功拿到资源
-	boolean failed = true;
-	try {
-		// 标记等待过程中是否中断过
-		boolean interrupted = false;
-		// 开始自旋，要么获取锁，要么中断
-		for (;;) {
-			// 获取当前节点的前驱节点
-			final Node p = node.predecessor();
-			// 如果p是头结点，说明当前节点在真实数据队列的首部，就尝试获取锁（别忘了头结点是虚节点）
-			if (p == head && tryAcquire(arg)) {
-				// 获取锁成功，头指针移动到当前node
-				setHead(node);
-				p.next = null; // help GC
-				failed = false;
-				return interrupted;
-			}
-			// 说明p为头节点且当前没有获取到锁（可能是非公平锁被抢占了）或者是p不为头结点，这个时候就要判断当前node是否要被阻塞（被阻塞条件：前驱节点的waitStatus为-1），防止无限循环浪费资源。具体两个方法下面细细分析
-			if (shouldParkAfterFailedAcquire(p, node) && parkAndCheckInterrupt())
-				interrupted = true;
-		}
-	} finally {
-		if (failed)
-			cancelAcquire(node);
-	}
-}
-```
-
-```java
-private void setHead(Node node) {
-	head = node;
-	node.thread = null;
-	node.prev = null;
-}
-
-// java.util.concurrent.locks.AbstractQueuedSynchronizer
-
-// 靠前驱节点判断当前线程是否应该被阻塞
-private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
-	// 获取头结点的节点状态
-	int ws = pred.waitStatus;
-	// 说明头结点处于唤醒状态
-	if (ws == Node.SIGNAL)
-		return true; 
-	// 通过枚举值我们知道waitStatus>0是取消状态
-	if (ws > 0) {
-		do {
-			// 循环向前查找取消节点，把取消节点从队列中剔除
-			node.prev = pred = pred.prev;
-		} while (pred.waitStatus > 0);
-		pred.next = node;
-	} else {
-		// 设置前任节点等待状态为SIGNAL
-		compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
-	}
-	return false;
-}
-```
-
-
-
-```java
-// java.util.concurrent.locks.AbstractQueuedSynchronizer
-
-public final boolean release(int arg) {
-	// 上边自定义的tryRelease如果返回true，说明该锁没有被任何线程持有
-	if (tryRelease(arg)) {
-		// 获取头结点
-		Node h = head;
-		// 头结点不为空并且头结点的waitStatus不是初始化节点情况，解除线程挂起状态
-		if (h != null && h.waitStatus != 0)
-			unparkSuccessor(h);
-		return true;
-	}
-	return false;
-}
-```
-
-```java
-// java.util.concurrent.locks.AbstractQueuedSynchronizer
-
-private void unparkSuccessor(Node node) {
-	// 获取头结点waitStatus
-	int ws = node.waitStatus;
-	if (ws < 0)
-		compareAndSetWaitStatus(node, ws, 0);
-	// 获取当前节点的下一个节点
-	Node s = node.next;
-	// 如果下个节点是null或者下个节点被cancelled，就找到队列最开始的非cancelled的节点
-	if (s == null || s.waitStatus > 0) {
-		s = null;
-		// 就从尾部节点开始找，到队首，找到队列第一个waitStatus<0的节点。
-		for (Node t = tail; t != null && t != node; t = t.prev)
-			if (t.waitStatus <= 0)
-				s = t;
-	}
-	// 如果当前节点的下个节点不为空，而且状态<=0，就把当前节点unpark
-	if (s != null)
-		LockSupport.unpark(s.thread);
-}
-```
-
-
-
-1. ReentrantReadWriteLock 
-
-   **同步状态的低16位用来表示写锁的获取次数**
-
-   **同步状态的高16位用来表示读锁被获取的次数**
-
-   ​      Write Lock  加锁： 
-
-   1. 有共享锁/有独占锁： 直接返还错误
-
-   2. 独占是自己： 重入
-   3. CAS 设置同步状态
-
-   ```java
-   protected final boolean tryAcquire(int acquires) {
-       /*
-        * Walkthrough:
-        * 1. If read count nonzero or write count nonzero
-        *    and owner is a different thread, fail.
-        * 2. If count would saturate, fail. (This can only
-        *    happen if count is already nonzero.)
-        * 3. Otherwise, this thread is eligible for lock if
-        *    it is either a reentrant acquire or
-        *    queue policy allows it. If so, update state
-        *    and set owner.
-        */
-       Thread current = Thread.currentThread();
-   	// 1. 获取写锁当前的同步状态
-       int c = getState();
-   	// 2. 获取写锁获取的次数
-       int w = exclusiveCount(c);
-       if (c != 0) {
-           // (Note: if c != 0 and w == 0 then shared count != 0)
-   		// 3.1 当读锁已被读线程获取或者当前线程不是已经获取写锁的线程的话
-   		// 当前线程获取写锁失败
-           if (w == 0 || current != getExclusiveOwnerThread())
-               return false;
-           if (w + exclusiveCount(acquires) > MAX_COUNT)
-               throw new Error("Maximum lock count exceeded");
-           // Reentrant acquire
-   		// 3.2 当前线程获取写锁，支持可重复加锁
-           setState(c + acquires);
-           return true;
-       }
-   	// 3.3 写锁未被任何线程获取，当前线程可获取写锁
-       if (writerShouldBlock() ||
-           !compareAndSetState(c, c + acquires))
-           return false;
-       setExclusiveOwnerThread(current);
-       return true;
-   }
-   ```
-
-   释放
-
-   ```java
-   protected final boolean tryRelease(int releases) {
-       if (!isHeldExclusively())
-           throw new IllegalMonitorStateException();
-   	//1. 同步状态减去写状态
-       int nextc = getState() - releases;
-   	//2. 当前写状态是否为0，为0则释放写锁
-       boolean free = exclusiveCount(nextc) == 0;
-       if (free)
-           setExclusiveOwnerThread(null);
-   	//3. 不为0则更新同步状态
-       setState(nextc);
-       return free;
-   }
-   
-   ```
-
-   只需要用**当前同步状态直接减去写状态的原因正是我们刚才所说的写状态是由同步状态的低16位表示的**。
-
-   ## 读锁的获取
-
-   \1. If write lock held by another thread, fail. *
-
-   \ 2. Otherwise, this thread is eligible for * lock wrt state, so ask if it should block * because of queue policy. If not, try * to grant by CASing state and updating count. Note that step does not check for reentrant * acquires, which is postponed to full version * to avoid having to check hold count in * the more typical non-reentrant case. * 
-
-   \3. If step 2 fails either because thread * apparently not eligible or CAS fails or count * saturated, chain to version with full retry loop.
-
-   
-   
-2. 
-
-3. 
-
-https://zhuanlan.zhihu.com/p/137624149
-
-https://juejin.im/post/5ae755606fb9a07ab97942a4
-
-# 算法
-
-1. 洗牌算法，**设计一个公平的洗牌算法**
-
-   
-   
-   ```pseudocode
-   -- To shuffle an array a of n elements (indices 0..n-1):
-   for i from n − 1 downto 1 do
-        j ← random integer such that 0 ≤ j ≤ i
-        exchange a[j] and a[i]
-   ```
-   
-2. 哈夫曼编码
-
-   https://blog.csdn.net/FX677588/article/details/70767446
-
-
-
-
-
-# 操作系统
-
-上下文切换： https://juejin.im/post/5c872a255188257e3f1afaef
-
-
-
-## 以下主要说明Swap机制：
-
-在Linux下，SWAP的作用类似Windows系统下的“虚拟内存”。当物理内存不足时，拿出部分硬盘空间当SWAP分区（虚拟成内存）使用，从而解决内存容量不足的情况。
-
-SWAP意思是交换，顾名思义，**当某进程向OS请求内存发现不足时，OS会把内存中暂时不用的数据交换出去，放在SWAP分区中，这个过程称为SWAP OUT**。**当某进程又需要这些数据且OS发现还有空闲物理内存时，又会把SWAP分区中的数据交换回物理内存中，这个过程称为SWAP IN**。
-
-当然，swap大小是有上限的，一旦swap使用完，操作系统会触发OOM-Killer机制，把消耗内存最多的进程kill掉以释放内存。
-
-
-
-
-
-## kill pid与kill -9 pid的区别
-
-​        kill pid的作用是向进程号为pid的进程发送SIGTERM（这是kill默认发送的信号），该信号是一个结束进程的信号且可以被应用程序捕获。若应用程序没有捕获并响应该信号的逻辑代码，则该信号的默认动作是kill掉进程。这是终止指定进程的推荐做法。
-​        kill -9 pid则是向进程号为pid的进程发送SIGKILL（该信号的编号为9），从本文上面的说明可知，SIGKILL既不能被应用程序捕获，也不能被阻塞或忽略，其动作是立即结束指定进程。通俗地说，应用程序根本无法“感知”SIGKILL信号，它在完全无准备的情况下，就被收到SIGKILL信号的操作系统给干掉了，显然，在这种“暴力”情况下，应用程序完全没有释放当前占用资源的机会。事实上，SIGKILL信号是直接发给init进程的，它收到该信号后，负责终止pid指定的进程。
-
----
-
-
-
-## **进程上下文**
-
-​    所谓的进程上下文，就是一个进程在执行的时候，CPU的所有寄存器中的值、进程的状态以及堆栈上的内容，当内核需要切换到另一个进程时，它需要保存当前进程的所有状态，即保存当前进程的进程上下文，以便再次执行该进程时，能够恢复切换时的状态，继续执行。
-
-​    一个进程的上下文可以分为三个部分:**用户级上下文**、**寄存器上下文**以及**系统级上下文**。
-
-* 用户级上下文: 正文、数据、用户堆栈以及共享存储区；
-
-* 寄存器上下文: 通用寄存器、程序寄存器(IP)、处理器状态寄存器(EFLAGS)、栈指针(ESP)；
-
-* 系统级上下文: 进程控制块task_struct、内存管理信息(mm_struct、vm_area_struct、pgd、pte)、内核栈。
-
-​    当发生进程调度时，进行进程切换就是上下文切换(context switch)。
-
-​    操作系统必须对上面提到的全部信息进行切换，新调度的进程才能运行。
-
-而**系统调用进行的是模式切换(mode switch)**。模式切换与进程切换比较起来，容易很多，而且节省时间，因为**模式切换最主要的任务只是切换进程寄存器上下文的切换**。进程上下文主要是异常处理程序和内核线程。内核之所以进入进程上下文是因为进程自身的一些工作需要在内核中做。例如，系统调用是为当前进程服务的，异常通常是处理进程导致的错误状态等。所以在进程上下文中引用current是有意义的。
-
-## 中断上下文具体包括：
-
-（1）硬件传递过来的参数
-
-因此上下文切换可以分为以下几类：
-
-（1）进程之间的上下文切换：A进程切换到B进程
-
-（2）进程和中断之间的上下文切换：进程A被中断打断
-
-（3）中断之间的上下文切换：低级别中断被高级别中断打断
-
-### **模式切换**
-
-这是要说一种特殊的上下文切换：模式切换，即进程A从用户态因为系统调用进入内核态，这种切换之所以特殊，是因为它并没有经过完整的上下文切换，只是寄存器上下文进行了切换，所以模式切换的耗时相对完整进程上下文更低。
-
-https://blog.csdn.net/zqixiao_09/article/details/50877756
-
-## 进程切换分两步
-
-1.切换**页目录以使用新的地址空间**
-
-2.切换**内核栈和硬件上下文**。
-
-对于linux来说，线程和进程的最大区别就在于地址空间。
-对于线程切换，第1步是不需要做的，第2是进程和线程切换都要做的。所以明显是进程切换代价大
-
-线程上下文切换和进程上下文切换一个最主要的区别是线程的切换虚拟内存空间依然是相同的，但是进程切换是不同的。这两种上下文切换的处理都是通过操作系统内核来完成的。内核的这种切换过程伴随的最显著的性能损耗是将寄存器中的内容切换出.
-
-另外一个隐藏的损耗是上下文的切换会扰乱处理器的缓存机制。简单的说，一旦去切换上下文，处理器中所有已经缓存的内存地址一瞬间都作废了。还有一个显著的区别是当你改变虚拟内存空间的时候，处理的页表缓（processor’s Translation Lookaside Buffer (TLB)）或者相当的神马东西会被全部刷新，这将导致内存的访问在一段时间内相当的低效。但是在线程的切换中，不会出现这个问题。
-
-## 进程上下文切换跟系统调用又有什么区别呢
-
-首先，**进程是由内核来管理和调度的，进程的切换只能发生在内核态**。所以，进程的上下文不仅包括了虚拟内存、栈、全局变量等用户空间的资源，还包括了内核堆栈、寄存器等内核空间的状态。
-
-因此，**进程的上下文切换就比系统调用时多了一步：在保存内核态资源（当前进程的内核状态和 CPU 寄存器）之前，需要先把该进程的用户态资源（虚拟内存、栈等）保存下来；而加载了下一进程的内核态后，还需要刷新进程的虚拟内存和用户栈**。
-
-如下图所示，保存上下文和恢复上下文的过程并不是“免费”的，需要内核在 CPU 上运行才能完成。
-
- Linux 通过 TLB（Translation Lookaside Buffer）来管理虚拟内存到物理内存的映射关系。当虚拟内存更新后，TLB 也需要刷新，内存的访问也会随之变慢。特别是在多处理器系统上，缓存是被多个处理器共享的，刷新缓存不仅会影响当前处理器的进程，还会影响共享缓存的其他处理器的进程。
-
-
-
-![img](https://pic2.zhimg.com/80/v2-440bb1699b2fa0f0340b38eabcbd7452_1440w.jpg)
-
-## 进程上下文切换的场景
-
-1. 为了保证所有进程可以得到公平调度，CPU 时间被划分为一段段的时间片，这些时间片再被轮流分配给各个进程。这样，当某个进程的时间片耗尽了，就会被系统挂起，切换到其它正在等待 CPU 的进程运行。
-2. 进程在系统资源不足（比如内存不足）时，要等到资源满足后才可以运行，这个时候进程也会被挂起，并由系统调度其他进程运行。
-3. 当进程通过睡眠函数 sleep 这样的方法将自己主动挂起时，自然也会重新调度。
-4. 当有优先级更高的进程运行时，为了保证高优先级进程的运行，当前进程会被挂起，由高优先级进程来运行
-5. 发生硬件中断时，CPU 上的进程会被中断挂起，转而执行内核中的中断服务程序。
-
-## 线程上下文切换
-
-线程与进程最大的区别在于：线程是调度的基本单位，而进程则是资源拥有的基本单位。说白了，所谓内核中的任务调度，实际上的调度对象是线程；而进程只是给线程提供了虚拟内存、全局变量等资源。
-
-所以，对于线程和进程，我们可以这么理解：
-
-- 当进程只有一个线程时，可以认为进程就等于线程。
-- 当进程拥有多个线程时，这些线程会共享相同的虚拟内存和全局变量等资源。这些资源在上下文切换时是不需要修改的。
--  另外，线程也有自己的私有数据，比如栈和寄存器等，这些在上下文切换时也是需要保存的。。
-
-
-
-
-
-
-
-## INODE
-
-stat -x file 
-
-![image-20200724230508284](./image/image-20200724230508284.png)
-
-## fork的实现分为以下两步
-
-\1. 复制进程资源
-\2. 执行该进程
-
-复制进程的资源包括以下几步
-\1. 进程pcb
-\2. 程序体，即代码段数据段等
-\3. 用户栈
-\4. 内核栈
-\5. 虚拟内存池
-\6. 页表
-
-- 子进程用于独立且唯一的进程 ID；
-- 子进程的父进程 ID 与父进程 ID 完全相同；
-- 子进程不会继承父进程的内存锁；
-- 子进程会重新设置进程资源利用率和 CPU 计时器；
-
-
-
-fork后子进程和父进程共享的资源还包括：
-
-* 打开的文件
-
-* 实际用户ID、实际组ID、有效用户ID、有效组ID
-
-* 添加组ID
-
-* 进程组ID
-
-* 会话期ID
-
-* 控制终端
-
-* 设置-用户-ID标志和设置-组-ID标志
-
-* 当前工作目录
-
-* 根目录
-
-* 文件方式创建屏蔽字
-
-* 信号屏蔽和排列
-
-* 对任一打开文件描述符的在执行时关闭标志
-
-* 环境
-
-* 连接的共享存储段（共享内存）
-
-* 资源限制
-
-  父子进程之间的区别是：
-
-* fork的返回值
-
-* 进程ID
-
-* 不同的父进程ID
-
-* 子进程的tms_utime，tms_stime，tms-cutime以及tms_ustime设置为0
-
-* 父进程设置的锁，子进程不继承
-
-* 子进程的未决告警被清除
-
-* 子进程的未决信号集设置为空集
-
-  
-
-## 进程的调度
-
-1 先来先服务调度算法
-先来先服务(FCFS)调度算法是一种最简单的调度算法，该算法既可用于作业调度，也可用于进程调度。当在作业调度中采用该算法时，每次调度都是从后备作业队列中选择一个或多个最先进入该队列的作业，将它们调入内存，为它们分配资源、创建进程，然后放入就绪队列。在进程调度中采用FCFS算法时，则每次调度是从就绪队列中选择一个最先进入该队列的进程，为之分配处理机，使之投入运行。该进程一直运行到完成或发生某事件而阻塞后才放弃处理机。
-
- 
-
-2、短作业(进程)优先调度算法
-短作业(进程)优先调度算法，是指对短作业或短进程优先调度的算法。它们可以分别用于作业调度和进程调度。短作业优先(SJF)的调度算法是从后备队列中选择一个或若干个估计运行时间最短的作业，将它们调入内存运行。而短进程优先(SPF)调度算法则是从就绪队列中选出一个估计运行时间最短的进程，将处理机分配给它，使它立即执行并一直执行到完成，或发生某事件而被阻塞放弃处理机时再重新调度。
-
- 
-
-3、时间片轮转法
-在早期的时间片轮转法中，系统将所有的就绪进程按先来先服务的原则排成一个队列，每次调度时，把CPU分配给队首进程，并令其执行一个时间片。时间片的大小从几ms到几百ms。当执行的时间片用完时，由一个计时器发出时钟中断请求，调度程序便据此信号来停止该进程的执行，并将它送往就绪队列的末尾；然后，再把处理机分配给就绪队列中新的队首进程，同时也让它执行一个时间片。这样就可以保证就绪队列中的所有进程在一给定的时间内均能获得一时间片的处理机执行时间。换言之，系统能在给定的时间内响应所有用户的请求。
-
- 
-
-4、多级反馈队列调度算法
-前面介绍的各种用作进程调度的算法都有一定的局限性。如短进程优先的调度算法，仅照顾了短进程而忽略了长进程，而且如果并未指明进程的长度，则短进程优先和基于进程长度的抢占式调度算法都将无法使用。而多级反馈队列调度算法则不必事先知道各种进程所需的执行时间，而且还可以满足各种类型进程的需要，因而它是目前被公认的一种较好的进程调度算法。在采用多级反馈队列调度算法的系统中，调度算法的实施过程如下所述：
-
-1）应设置多个就绪队列，并为各个队列赋予不同的优先级。第一个队列的优先级最高，第二个队列次之，其余各队列的优先权逐个降低。该算法赋予各个队列中进程执行时间片的大小也各不相同，在优先权愈高的队列中，为每个进程所规定的执行时间片就愈小。例如，第二个队列的时间片要比第一个队列的时间片长一倍，第i+1个队列的时间片要比第i个队列的时间片长一倍。
-
-2）当一个新进程进入内存后，首先将它放入第一队列的末尾，按FCFS原则排队等待调度。当轮到该进程执行时，如它能在该时间片内完成，便可准备撤离系统；如果它在一个时间片结束时尚未完成，调度程序便将该进程转入第二队列的末尾，再同样地按FCFS原则等待调度执行；如果它在第二队列中运行一个时间片后仍未完成，再依次将它放入第三队列，……，如此下去，当一个长作业(进程)从第一队列依次降到第n队列后，在第n队列便采取按时间片轮转的方式运行。
-
-3）仅当第一队列空闲时，调度程序才调度第二队列中的进程运行；仅当第1～(i-1)队列均空时，才会调度第i队列中的进程运行。如果处理机正在第i队列中为某进程服务时，又有新进程进入优先权较高的队列(第1～(i-1)中的任何一个队列)，则此时新进程将抢占正在运行进程的处理机，即第i队列中某个正在运行的进程的时间片用完后，由调度程序选择优先权较高的队列中的那一个进程，把处理机分配给它。
-
-优先权调度算法
-为了照顾紧迫型作业，使之在进入系统后便获得优先处理，引入了最高优先权优先(FPF)调度算法。此算法常被用于批处理系统中，作为作业调度算法，也作为多种操作系统中的进程调度算法，还可用于实时系统中。当把该算法用于作业调度时，系统将从后备队列中选择若干个优先权最高的作业装入内存。当用于进程调度时，该算法是把处理机分配给就绪队列中优先权最高的进程，这时，又可进一步把该算法分成如下两种。
-
-1) 非抢占式优先权算法
-
-在这种方式下，系统一旦把处理机分配给就绪队列中优先权最高的进程后，该进程便一直执行下去，直至完成；或因发生某事件使该进程放弃处理机时，系统方可再将处理机重新分配给另一优先权最高的进程。这种调度算法主要用于批处理系统中；也可用于某些对实时性要求不严的实时系统中。
-
-2) 抢占式优先权调度算法
-
-在这种方式下，系统同样是把处理机分配给优先权最高的进程，使之执行。但在其执行期间，只要又出现了另一个其优先权更高的进程，进程调度程序就立即停止当前进程(原优先权最高的进程)的执行，重新将处理机分配给新到的优先权最高的进程。因此，在采用这种调度算法时，是每当系统中出现一个新的就绪进程i时，就将其优先权Pi与正在执行的进程j的优先权Pj进行比较。如果Pi≤Pj，原进程Pj便继续执行；但如果是Pi>Pj，则立即停止Pj的执行，做进程切换，使i进程投入执行。显然，这种抢占式的优先权调度算法能更好地满足紧迫作业的要求，故而常用于要求比较严格的实时系统中，以及对性能要求较高的批处理和分时系统中。
-
-Linux 从整体上区分实时进程和普通进程，因为实时进程和普通进程度调度是不同的，它们两者之间，实时进程应该先于普通进程而运行，然后，对于同一类型的不同进程，采用不同的标准来选择进程。对普通进程的调度策略是动态优先调度，对于实时进程采用了两种调度策略，FIFO(先来先服务调度)和RR（时间片轮转调度）。
-
-UNIX系统是单纯的分时系统，所以没有设置作业调度。UNIX系统的进程调度采用的算法是，多级反馈队列调度法。其核心思想是先从最高休先级就绪队列中取出排在队列最前面的进程，当进程执行完一个时间片仍未完成则剥夺它的执行，将它放入到相应的队列中，取出下一个就绪进程投入运行，对于同一个队列中的各个进程，按照时间片轮转法调度。多级反馈队列调度算法即能使高优先级的作业得到响应又能使短作业（进程）迅速完成。但是它还是存在某些方面的不足，当不断有新进程到来时，则长进程可能饥饿。
-
-# 完全公平调度算法CFS
-
-
-原文链接：https://blog.csdn.net/fuzhongmin05/java/article/details/55802925
-
-https://blog.csdn.net/XD_hebuters/article/details/79623130
-
-## 进程的组成
-
- **进程是由程序控制块（PCB）、程序段、数据段组成。**
-  操作系统是通过PCB来管理进程，因此PCB中应该包含操作系统对其进行管理所需的各种信息，如进程描述信息、进程控制和管理信息、资源分配清单和处理机相关信息。
-  程序段：程序代码存放的位置。
-  数据段：程序运行时使用、产生的运算数据。如全局变量、局部变量、宏定义的常量就存放在数据段内。
-
-PCB 里面 task—Struct
-
-标识相关：pid，ppid等等
-文件相关：进程需要记录打开的文件信息，于是需要文件描述符表
-内存相关：内存指针，指向进程的虚拟地址空间（用户空间）信息
-优先级相关：进程相对于其他进程的调度优先级
-上下文信息相关：CPU的所有寄存器中的值、进程的状态以及堆栈上的内容，当内核需要切换到另一个进程时，需要保存当前进程的所有状态，即保存当前进程的进程上下文，以便再次执行该进程时，能够恢复切换时的状态，继续执行。
-状态相关：进程当前的状态，说明该进程处于什么状态
-信号相关：进程的信号处理函数，以及记录当前进程是否还有待处理的信号
-I/O相关：记录进程与各种I/O设备之间的交互
-
-
-
-float
-
-![image-20200629130913247](./image/image-20200629130913247.png)
-
-![image-20200629130931296](./image/image-20200629130931296.png)
-
-
-
-![image-20200629130947046](./image/image-20200629130947046.png)
-
-1. double 编码
-
-   ![image-20200629131016685](./image/image-20200629131016685.png)
-
-   ![image-20200629131050228](./image/image-20200629131050228.png)
-
-2. ## 进程与线程
-
-   **进程是程序在计算机上的一次执行活动。**当你运行一个程序，你就启动了一个进程。显然，程序只是一组指令的有序集合，它本身没有任何运行的含义，只是一个静态实体。而进程则不同，它是程序在某个数据集上的执行，是一个动态实体。它因创建而产生，因调度而运行，因等待资源或事件而被处于等待状态，因完成任务而被撤消，反映了一个程序在一定的数据集上运行的全部动态过程。
-
-   **进程是操作系统分配资源的单位。**在Windows下，进程又被细化为线程，也就是一个进程下有多个能独立运行的更小的单位。
-
-   **线程(Thread)是进程的一个实体，是CPU调度和分派的基本单位。**线程不能够独立执行，必须依存在应用程序中，由应用程序提供多个线程执行控制
-
-   
-
-   
-
-3. ## PCB一般包括：
-
-   1.程序ID（PID、进程句柄）：它是唯一的，一个进程都必须对应一个PID。PID一般是整形数字
-
-   2.特征信息：一般分系统进程、用户进程、或者内核进程等
-
-   3.进程状态：运行、就绪、阻塞，表示进程现的运行情况
-
-   4.优先级：表示获得CPU控制权的优先级大小
-
-   5.通信信息：进程之间的通信关系的反映，由于操作系统会提供通信信道
-
-   6.现场保护区：保护阻塞的进程用
-
-   7.资源需求、分配控制信息
-
-   8.进程实体信息，指明程序路径和名称，进程数据在物理内存还是在交换分区（分页）中
-
-   9.其他信息：工作单位，工作区，文件信息等 [1]
-
-4. ## 逻辑地址、相对地址与物理地址
-
-   
-
- 逻辑地址：与当前数据在内存中的物理分配地址无关的访问地址，在执行对内存的访问之前必须转化为物理地址。
-
-相对地址：特殊的逻辑地址，相对于某些已知点的存储单元。
-
-物理地址：数据在主存中的实际位置
-
-5. ## 分段分页
-
-   **分页**逻辑地址到物理地址的映射过程，分页系统中，允许将进程的每一页离散地存储在内存的任一物理块中，为了能在内存中找到每个页面对应的物理块，系统为每个进程建立一张页表，用于记录进程逻辑页面与内存物理页面之间的对应关系。页表的作用是实现从页号到物理块号的地址映射，地址空间有多少页，该页表里就登记多少行，且按逻辑页的顺序排列，形如：
-
-   
-
-   分段存储管理
-
-   1.基本思想
-
-   页面是主存物理空间中划分出来的等长的固定区域。分页方式的优点是页长固定，因而便于构造页表、易于管理，且不存在外碎片。但分页方式的缺点是页长与程序的逻辑大小不相关。例如，某个时刻一个子程序可能有一部分在主存中，另一部分则在辅存中。这不利于编程时的独立性，并给换入换出处理、存储保护和存储共享等操作造成麻烦。
-
-   另一种划分可寻址的存储空间的方法称为分段。段是按照程序的自然分界划分的长度可以动态改变的区域。通常，程序员把子程序、操作数和常数等不同类型的数据划分到不同的段中，并且每个程序可以有多个相同类型的段。
-
-    段表本身也是一个段，可以存在辅存中，但一般是驻留在主存中。将用户程序地址空间分成若干个大小不等的段，每段可以定义一组相对完整的逻辑信息。存储分配时，以段为单位，段与段在内存中可以不相邻接，也实现了离散分配。
-
-   2. 分段地址结构
-
-   作业的地址空间被划分为若干个段，每个段定义了一组逻辑信息。例程序段、数据段等。每个段都从0开始编址，并采用一段连续的地址空间。段的长度由相应的逻辑信息组的长度决定，因而各段长度不等。整个作业的地址空间是二维的。
-
-   在段式虚拟存储系统中，虚拟地址由段号和段内地址组成，虚拟地址到实存地址的变换通过段表来实现。每个程序设置一个段表，段表的每一个表项对应一个段，每个表项至少包括三个字段：有效位（指明该段是否已经调入主存）、段起址(该段在实存中的首地址)和段长（记录该段的实际长度）。
-
-   ***分段存储方式的优缺点***
-
-   分页对程序员而言是不可见的，而分段通常对程序员而言是可见的，因而分段为组织程序和数据提供了方便。与页式虚拟存储器相比，段式虚拟存储器有许多优点：
-
-   (1)    段的逻辑独立性使其易于编译、管理、修改和保护，也便于多道程序共享。
-
-   (2)    段长可以根据需要动态改变，允许自由调度，以便有效利用主存空间。
-
-   (3)    方便编程，分段共享，分段保护，动态链接，动态增长
-
-    因为段的长度不固定，段式虚拟存储器也有一些缺点：
-
-   (1)    主存空间分配比较麻烦。
-
-   (2)    容易在段间留下许多碎片，造成存储空间利用率降低。
-
-   (3)    由于段长不一定是2的整数次幂，因而不能简单地像分页方式那样用虚拟地址和实存地址的最低若干二进制位作为段内地址，并与段号进行直接拼接，必须用加法操作通过段起址与段内地址的求和运算得到物理地址。因此，段式存储管理比页式存储管理方式需要更多的硬件支持。
-
-
-
-
-
-
-   段页式结合 对于每一个虚拟地址，处理器使用段号检索进程段表来寻找该段的页表；页号用来检索页表并查找到帧号。
-
-   段页式存储管理的基本思想
-
-   段页式存储组织是分段式和分页式结合的存储组织方法，这样可充分利用分段管理和分页管理的优点。
-
-   　  (1) 用分段方法来分配和管理虚拟存储器。程序的地址空间按逻辑单位分成基本独立的段，而每一段有自己的段名，再把每段分成固定大小的若干页。
-
-   (2) 用分页方法来分配和管理实存。即把整个主存分成与上述页大小相等的存储块，可装入作业的任何一页。程序对内存的调入或调出是按页进行的。但它又可按段实现共享和保护。
-
-   
-
-   
-
-   段页式存储管理的优缺点
-
-    优点
-
-   (1) 它提供了大量的虚拟存储空间。
-
-   (2) 能有效地利用主存，为组织多道程序运行提供了方便。
-
-   缺点：
-
-   (1) 增加了硬件成本、系统的复杂性和管理上的开消。
-
-   (2) 存在着系统发生抖动的危险。
-
-   (3) 存在着内碎片。
-
-   (4) 还有各种表格要占用主存空间。
-
-   　段页式存储管理技术对当前的大、中型计算机系统来说，算是最通用、最灵活的一种方案。
-   ————————————————
-
-   原文链接：https://blog.csdn.net/zephyr_be_brave/java/article/details/8944967
-
-   
-
-5. ### 进程间通信IPC (InterProcess Communication)
-
-   **1.** **管道/** 匿名管道(pipe) 只能用于父子进程或者兄弟进程之间(具有亲缘关系的进程
-
-6. ### 虚拟内存
-
-   虚拟内存的目的是为了让物理内存扩充成更大的逻辑内存，从而让程序获得更多的可用内存，为了更好的管理内存，操作系统将内存抽象成地址空间。每个程序拥有自己的地址空间，这个地址空间被分割成多个块，每一块称为一页。这些页被映射到物理内存，但不需要映射到连续的物理内存，也不需要所有页都必须在物理内存中。当程序引用到不在物理内存中的页时，由硬件执行必要的映射，将缺失的部分装入物理内存并重新执行失败的指令。
-
-   内存管理单元（MMU）管理着地址空间和物理内存的转换，其中的页表（Page table）存储着页（程序地址空间）和页框（物理内存空间）的映射表。
-
-   一个虚拟地址分成两个部分，一部分存储页面号，一部分存储偏移量。
-
-7. ### 死锁必要条件和处理方法
-
-   - 互斥：每个资源要么已经分配给了一个进程，要么就是可用的。
-   - 占有和等待：已经得到了某个资源的进程可以再请求新的资源。
-   - 不可抢占：已经分配给一个进程的资源不能强制性地被抢占，它只能被占有它的进程显式地释放。
-   - 环路等待：有两个或者两个以上的进程组成一条环路，该环路中的每个进程都在等待下一个进程所占有的资源。
-
-8. ### 硬盘有什么组成
-
-   （磁头、磁道、扇区、柱面）
-
-   
-
-9. ## linux启动方式
-
-   
-   原文链接：https://blog.csdn.net/a624731186/java/article/details/22691049
-   
-   1. BIOS自检,BIOS的第一个步骤是加电自检,BIOS的第二个步骤是检测本地设备。,侦测电脑周边配套设备是否工作正  常,如cpu的类型,速度,缓存等;主板类型,内存的速度,容量,硬盘的大小,类型和工作模式,风扇速度等,主要是为了检查这些设备在开机的时候是否能正常的工作.
-   2. 载入启动程序
-         主板的BIOS会读取硬盘的主引导记录(MBR),MBR中存放的是一段很小的程序,他的功能是从硬盘读取操作系统核心文件并运行,因为这个小程序太小了,因此通常这个小程序不具备直接引导系统内核的能力,他先去引导另一个稍微大一点的小程序,再由这个大一点的小程序去引导系统内核.
-   3. 加载内核
-        LINUX内核一般是压缩保存的，因此，它首先要进行自身的解压缩。内核映象前面的一些代码完成解压缩。解压后将其放入高端内存中，如果有初始RAM磁盘映像，就会将它移动到内存中，并标明以后使用，然后内核映象前面的代码调用内核，并开始启动内核引导的过程 
-   4. 启动init服务
-          这里的Init程序，一般放在/sbin下,(到这里会出现很多不同的启动方式，主要有：SystemV,BSD,upstart和systemd).
-           这里主要说SystemV,init进程是所有进程的起点，也是Linux内核启动后的第一个动作，所以这个程序的PID是永远是1，init进程是所有进程的发起者和控制者
-   5. 执行run level对应目录中的脚本，例如：等级为5，则执行/etc/rc.d/rc5.d下面的脚本
-        执行时按脚本的文件名 串行执行，这样就造成开机比较慢。目前systemd是以并行执行（号称最快2秒开机）
-   
-10. ## 用户态到内核态切换可以通过三种方式：
-
-    1. 系统调用，这个上面已经讲解过了。其实系统调用本身就是中断，但是软件中断，跟硬中断不同。
-    2. 异常：如果当前进程运行在用户态，如果这个时候发生了异常事件，就会触发切换。例如：缺页异常。
-    3. 外设中断：当外设完成用户的请求时，会向CPU发送中断信号。
-
-11. ## c/c++ struct的大小
-
-    3条原则:(在没有#pragma pack宏的情况下)
-
-    １:数据成员对齐规则：结构(struct)(或联合(union))的数据成员，第一个数据成员放在offset为0的地方，以后每个数据成员存储的起始位置要从该成员大小的整数倍开始(比如int在３２位机为４字节,则要从４的整数倍地址开始存储。
-
-    ２:结构体作为成员:如果一个结构里有某些结构体成员,则结构体成员要从其内部最大元素大小的整数倍地址开始存储.(struct a里存有struct b,b里有char,int ,double等元素,那b应该从8的整数倍开始存储.)
-
-    ３:收尾工作:结构体的总大小,也就是sizeof的结果,.必须是其内部最大成员的整数倍.不足的要补齐
-
-12. ## Linux下 文件描述符（fd）与 文件指针（FILE*）
-
-    ![image-20200719165144942](./image/image-20200719165144942.png)
-
-13. ### 磁盘调度算法  （SCAN：电梯调度算法）
-
-   https://blog.csdn.net/Jaster_wisdom/article/details/52345674
-
-
-
-![image-20200719192434420](./image/image-20200719192434420.png)
+https://www.voidking.com/dev-linux-snat/
 
 # 网络
+
+
 
 ## 概述
 
@@ -2074,80 +214,80 @@ float
 
 **传输层** 传输协议同时进行流量控制或是基于接收方可接收数据的快慢程度规定适当的发送速率。除此之外，传输层按照网络能处理的最大尺寸将较长的数据包进行强制分割。例如，以太网无法接收大于1500字节的数据包。发送方节点的传输层将[数据分割](http://baike.baidu.com/view/4466818.htm)成较小的数据片，同时对每一数据片安排一序列号，以便数据到达接收方节点的传输层时，能以正确的顺序重组。该过程即被称为排序。工作在传输层的一种服务是 TCP/IP 协议套中的TCP （Transport Control Protocol，[传输控制协议](http://baike.baidu.com/view/544903.htm)），UDP (User Packet Data，用户数据报协议)，另一项传输层服务是IPX/SPX协议集的SPX（序列包交换）。
 
-1. ### 物理层和链路层
+### 物理层和链路层
 
-   物理层的线路有传输介质与通信设备组成，比特流在传输介质上传输时肯定会存在误差的。这样就引入了数据链路层在物理层之上，采用差错检测、差错控制和流量控制等方法，向网络层提供高质量的数据传输服务。对于网络层，由于链路层的存在，而不需要关心物理层具体采用了那种传输介质和通信设备。
+物理层的线路有传输介质与通信设备组成，比特流在传输介质上传输时肯定会存在误差的。这样就引入了数据链路层在物理层之上，采用差错检测、差错控制和流量控制等方法，向网络层提供高质量的数据传输服务。对于网络层，由于链路层的存在，而不需要关心物理层具体采用了那种传输介质和通信设备。
 
-   ## **那链路层的功能有哪些呢？需要完成哪些事情呢？**
+## **那链路层的功能有哪些呢？需要完成哪些事情呢？**
 
-   1. 链路管理，帧同步
-   2. 流量控制，差错控制
-   3. 数据和控制信息分开
-   4. 透明传输和**寻址**
+1. 链路管理，帧同步
+2. 流量控制，差错控制
+3. 数据和控制信息分开
+4. 透明传输和**寻址**
 
-   ## 网络层和传输层的作用
+## 网络层和传输层的作用
 
-   网络层只把分组发送到目的主机，但是真正通信的并不是主机而是主机中的进程。传输层提供了进程间的逻辑通信，传输层向高层用户屏蔽了下面网络层的核心细节，使应用程序看起来像是在两个传输层实体之间有一条端到端的逻辑通信信道。
+网络层只把分组发送到目的主机，但是真正通信的并不是主机而是主机中的进程。传输层提供了进程间的逻辑通信，传输层向高层用户屏蔽了下面网络层的核心细节，使应用程序看起来像是在两个传输层实体之间有一条端到端的逻辑通信信道。
 
-   
 
-   ## PPP
 
-   ![image-20200704172812352](./image/image-20200704172812352.png)
+## PPP
 
-   ### 透明传输的基本概念：
+![image-20200704172812352](./image/image-20200704172812352.png)
 
-   数据透明传输就是用户不受协议中的任何限制，可随机的传输任意比特编码的信息
-   用户可以完全不必知道协议中所规定的结束段的比特编码或者其他的控制字符，因而不受限制的进行传输。
-   数据透明传输技术：
+### 透明传输的基本概念：
 
-   转义字符填充法
-   零比特填充法
-   采用特殊的信号与编码法：IEEE802.3(由于使用CSMA/CD协议，没有结束字符段；IEEE802.4（令牌总线，在起始定界符SD/结束定界符ED这两个字段被使用模拟编码，而不是0和1）；IEEE802.5（令牌环，违例的曼切斯特码）
-   确定长度法，固定数据段长度法：各控制字段的长度固定，数据段长度也是固定的，那么在帧格式中就不必设结束符，也不必设数据长度字段。
-   ————————————————
-   原文链接：https://blog.csdn.net/xie294777315/java/article/details/24176611
+数据透明传输就是用户不受协议中的任何限制，可随机的传输任意比特编码的信息
+用户可以完全不必知道协议中所规定的结束段的比特编码或者其他的控制字符，因而不受限制的进行传输。
+数据透明传输技术：
 
-   ## MAC 地址
+转义字符填充法
+零比特填充法
+采用特殊的信号与编码法：IEEE802.3(由于使用CSMA/CD协议，没有结束字符段；IEEE802.4（令牌总线，在起始定界符SD/结束定界符ED这两个字段被使用模拟编码，而不是0和1）；IEEE802.5（令牌环，违例的曼切斯特码）
+确定长度法，固定数据段长度法：各控制字段的长度固定，数据段长度也是固定的，那么在帧格式中就不必设结束符，也不必设数据长度字段。
+————————————————
+原文链接：https://blog.csdn.net/xie294777315/java/article/details/24176611
 
-   MAC 地址是链路层地址，长度为 6 字节（48 位），用于唯一标识网络适配器（网卡）。一台主机拥有多少个网络适配器就有多少个 MAC 地址。例如笔记本电脑普遍存在无线网络适配器和有线网络适配器，因此就有两个 MAC 地址。
+## MAC 地址
 
-   
+MAC 地址是链路层地址，长度为 6 字节（48 位），用于唯一标识网络适配器（网卡）。一台主机拥有多少个网络适配器就有多少个 MAC 地址。例如笔记本电脑普遍存在无线网络适配器和有线网络适配器，因此就有两个 MAC 地址。
 
-   ### 链路层三个基本问题
 
-   1. 将网络层传下来的分组添加首部和尾部，用于标记帧的开始和结束。
 
-   2. 透明表示一个实际存在的事物看起来好像不存在一样。帧使用首部和尾部进行定界，如果帧的数据部分含有和首部尾部相同的内容，那么帧的开始和结束位置就会被错误的判定。需要在数据部分出现首部尾部相同的内容前面插入转义字符。如果数据部分出现转义字符，那么就在转义字符前面再加个转义字符。在接收端进行处理之后可以还原出原始数据。这个过程透明传输的内容是转义字符，用户察觉不到转义字符的存在。
+### 链路层三个基本问题
 
-   ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/e738a3d2-f42e-4755-ae13-ca23497e7a97.png)
+1. 将网络层传下来的分组添加首部和尾部，用于标记帧的开始和结束。
 
-   
+2. 透明表示一个实际存在的事物看起来好像不存在一样。帧使用首部和尾部进行定界，如果帧的数据部分含有和首部尾部相同的内容，那么帧的开始和结束位置就会被错误的判定。需要在数据部分出现首部尾部相同的内容前面插入转义字符。如果数据部分出现转义字符，那么就在转义字符前面再加个转义字符。在接收端进行处理之后可以还原出原始数据。这个过程透明传输的内容是转义字符，用户察觉不到转义字符的存在。
 
-   3. 差错校验目前数据链路层广泛使用了循环冗余检验（CRC）来检查比特差错。
+![img](/Users/ano/Desktop/notes/image/e738a3d2-f42e-4755-ae13-ca23497e7a97.png)
 
-   ## ip数据报
 
-   ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/85c05fb1-5546-4c50-9221-21f231cdc8c5.jpg)
 
-   
+3. 差错校验目前数据链路层广泛使用了循环冗余检验（CRC）来检查比特差错。
 
-   - **版本** : 有 4（IPv4）和 6（IPv6）两个值；
-   - **首部长度** : 占 4 位，因此最大值为 15。值为 1 表示的是 1 个 32 位字的长度，也就是 4 字节。因为固定部分长度为 20 字节，因此该值最小为 5。如果可选字段的长度不是 4 字节的整数倍，就用尾部的填充部分来填充。
-   - **区分服务** : 用来获得更好的服务，一般情况下不使用。
-   - **总长度** : 包括首部长度和数据部分长度。
-   - **生存时间** ：TTL，它的存在是为了防止无法交付的数据报在互联网中不断兜圈子。以路由器跳数为单位，当 TTL 为 0 时就丢弃数据报。
-   - **协议** ：指出携带的数据应该上交给哪个协议进行处理，例如 ICMP、TCP、UDP 等。
-   - **首部检验和** ：因为数据报每经过一个路由器，都要重新计算检验和，因此检验和不包含数据部分可以减少计算的工作量。
-   - **标识** : 在数据报长度过长从而发生分片的情况下，相同数据报的不同分片具有相同的标识符。
-   - **片偏移** : 和标识符一起，用于发生分片的情况。片偏移的单位为 8 字节。
-   - ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/23ba890e-e11c-45e2-a20c-64d217f83430.png)
+## ip数据报
 
-   ### ip 地址分类
+![img](/Users/ano/Desktop/notes/image/85c05fb1-5546-4c50-9221-21f231cdc8c5.jpg)
 
-   IP 地址 ::= {< 网络号 >, < 主机号 >}
 
-   ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/cbf50eb8-22b4-4528-a2e7-d187143d57f7.png)
+
+- **版本** : 有 4（IPv4）和 6（IPv6）两个值；
+- **首部长度** : 占 4 位，因此最大值为 15。值为 1 表示的是 1 个 32 位字的长度，也就是 4 字节。因为固定部分长度为 20 字节，因此该值最小为 5。如果可选字段的长度不是 4 字节的整数倍，就用尾部的填充部分来填充。
+- **区分服务** : 用来获得更好的服务，一般情况下不使用。
+- **总长度** : 包括首部长度和数据部分长度。
+- **生存时间** ：TTL，它的存在是为了防止无法交付的数据报在互联网中不断兜圈子。以路由器跳数为单位，当 TTL 为 0 时就丢弃数据报。
+- **协议** ：指出携带的数据应该上交给哪个协议进行处理，例如 ICMP、TCP、UDP 等。
+- **首部检验和** ：因为数据报每经过一个路由器，都要重新计算检验和，因此检验和不包含数据部分可以减少计算的工作量。
+- **标识** : 在数据报长度过长从而发生分片的情况下，相同数据报的不同分片具有相同的标识符。
+- **片偏移** : 和标识符一起，用于发生分片的情况。片偏移的单位为 8 字节。
+- ![img](/Users/ano/Desktop/notes/image/23ba890e-e11c-45e2-a20c-64d217f83430.png)
+
+### ip 地址分类
+
+IP 地址 ::= {< 网络号 >, < 主机号 >}
+
+![img](/Users/ano/Desktop/notes/image/cbf50eb8-22b4-4528-a2e7-d187143d57f7.png)
 
 10. ### 子网
 
@@ -2163,29 +303,28 @@ float
 
    ICMP 是为了更有效地转发 IP 数据报和提高交付成功的机会。它封装在 IP 数据报中，但是不属于高层协议。
 
-   ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/e3124763-f75e-46c3-ba82-341e6c98d862.jpg)
+   ![img](/Users/ano/Desktop/notes/image/e3124763-f75e-46c3-ba82-341e6c98d862.jpg)
 
    
 
    ICMP 报文分为差错报告报文和询问报文。
 
-   ![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/aa29cc88-7256-4399-8c7f-3cf4a6489559.png)
+   ![img](/Users/ano/Desktop/notes/image/aa29cc88-7256-4399-8c7f-3cf4a6489559.png)
 
 ## ARP(Address Resolution Protocol，地址解析协议) 
 
-在局域网中获取目的 IP 地址对应的 MAC 地址：
+在局域网中获取目的 IP 地址对应的 MAC 地址：源主机会向当前局域网中发送 ARP 请求，目标的 MAC 地址是 `FF-FF-FF-FF-FF-FF`，这表示当前请求是一个广播请求，局域网内的所有设备都会收到该请求；接收到 ARP 请求的主机都会检查目的 IP 和自己的 IP 地址是否一致；
 
-1. 源主机会向当前局域网中发送 ARP 请求，目标的 MAC 地址是 `FF-FF-FF-FF-FF-FF`，这表示当前请求是一个广播请求，局域网内的所有设备都会收到该请求；
-2. 接收到 ARP 请求的主机都会检查目的 IP 和自己的 IP 地址是否一致；
-   1. 如果 IP 地址不一致，主机会忽略当前的 ARP 请求；
-   2. 如果 IP 地址一致，主机会直接向源主机发送 ARP 响应；
-3. 源主机在接收到 ARP 的响应之后，会更新本地的缓存表并继续向目的主机发送数据；
+1. 如果 IP 地址不一致，主机会忽略当前的 ARP 请求；
+2. 如果 IP 地址一致，主机会直接向源主机发送 ARP 响应；
 
-   ## [1. Ping]
+源主机在接收到 ARP 的响应之后，会更新本地的缓存表并继续向目的主机发送数据；
 
-   Ping 是 ICMP 的一个重要应用，主要用来测试两台主机之间的连通性。
+## [1. Ping]
 
-   Ping 的原理是通过向目的主机发送 ICMP Echo 请求报文，目的主机收到之后会发送 Echo 回答报文。Ping 会根据时间和成功响应的次数估算出数据包往返时间以及丢包率。
+Ping 是 ICMP 的一个重要应用，主要用来测试两台主机之间的连通性。
+
+Ping 的原理是通过向目的主机发送 ICMP Echo 请求报文，目的主机收到之后会发送 Echo 回答报文。Ping 会根据时间和成功响应的次数估算出数据包往返时间以及丢包率。
 
 ping+一个公网地址，网络层及以下会发生什么
 
@@ -2195,7 +334,7 @@ ping+一个公网地址，网络层及以下会发生什么
 
 3. 当路由器收到主机A发过来的ICMP报文，发现自己的目的地址是其本身MAC地址，根据目的的IP2.1.1.1，查路由表，发现2.1.1.1/24的路由表项，得到一个出口指针，去掉原来的MAC头部，加上自己的MAC地址向主机C转发。(如果网关也没有主机C的MAC地址，还是要向前面一个步骤一样，ARP广播一下即可相互学到。路由器2端口能学到主机D的MAC地址，主机D也能学到路由器2端口的MAC地址。)报文格式如下：
 
-   ![img](https://img-blog.csdn.net/20160311232426001)
+   ![img](/Users/ano/Desktop/notes/image/20160311232426001.png)
 
 4. 最后，在主机C已学到路由器2端口MAC地址，路由器2端口转发给路由器1端口，路由1端口学到主机A的MAC地址的情况下，他们就不需要再做ARP解析，就将ICMP的回显请求回复过来。报文格式大致如下: 
 
@@ -2269,7 +408,50 @@ PC1（192.168.0.2）----------------(eth0（192.168.0.1） 路由器 eth1（192.
 
      
 
-   
+## 路由算法
+
+### RIP 
+
+![image-20200829191240542](/Users/ano/Desktop/notes/image/image-20200829191240542.png)
+
+##    ![image-20200829192204614](/Users/ano/Desktop/notes/image/image-20200829192204614.png)
+
+![image-20200829192623042](/Users/ano/Desktop/notes/image/image-20200829192623042.png)
+
+
+
+![image-20200829193011132](/Users/ano/Desktop/notes/image/image-20200829193011132.png)
+
+### OSPF
+
+![image-20200829220127739](/Users/ano/Desktop/notes/image/image-20200829220127739.png)
+
+
+
+## RTT测量原理
+
+ 
+
+RTT的测量可以采用两种方法：
+
+（1）TCP Timestamp选项
+在前面的blog中有详细的介绍过这个选项，TCP时间戳选项可以用来精确的测量RTT。RTT = 当前时间 - 数据包中Timestamp选项的回显时间，这个回显时间是该数据包发出去的时间，知道了数据包的接收时间（当前时间）和发送时间
+（回显时间），就可以轻松的得到RTT的一个测量值。
+
+（2）重传队列中数据包的TCP控制块
+在TCP重传队列中保存着发送而未被确认的数据包，数据包skb中的TCP控制块包含着一个变量，tcp_skb_cb->when，记录了该数据包的第一次发送时间。RTT = 当前时间 - when
+
+有人可能会问：既然不用TCP Timestamp选项就能测量出RTT，为什么还要多此一举？
+这是因为方法一比方法二的功能更加强大，它们是有区别的。
+“TCP must use Karn's algorithm for taking RTT samples. That is, RTT samples MUST NOT
+be made using segments that were retransmitted (and thus for which it is ambiguious whether
+the reply was for the first instance of the packet or a later instance). The only case when TCP
+can safely take RTT samples from retransmitted segments is when the TCP timestamp option
+is employed, since the timestamp option removes the ambiguity regarding which instance of
+the data segment triggered the acknowledgement.”
+对于重传的数据包的响应，方法1可以用它来采集一个新的RTT测量样本，而方法二则不能。因为
+TCP Timestamp选项可以区分这个响应是原始数据包还是重传数据包触发的，从而计算出准确的
+RTT值。
 
 ## Tcp UDP 区别
 
@@ -2279,7 +461,7 @@ PC1（192.168.0.2）----------------(eth0（192.168.0.1） 路由器 eth1（192.
 
 ## UDP 首部格式
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/d4c3a4a1-0846-46ec-9cc3-eaddfca71254.jpg)
+![img](/Users/ano/Desktop/notes/image/d4c3a4a1-0846-46ec-9cc3-eaddfca71254.jpg)
 
 
 
@@ -2287,7 +469,7 @@ PC1（192.168.0.2）----------------(eth0（192.168.0.1） 路由器 eth1（192.
 
 ## TCP 首部格式
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/55dc4e84-573d-4c13-a765-52ed1dd251f9.png)
+![img](/Users/ano/Desktop/notes/image/55dc4e84-573d-4c13-a765-52ed1dd251f9.png)
 
 
 
@@ -2335,7 +517,7 @@ MSS就是TCP数据包每次能够传输的最大数据分段。为了达到最�
 
 客户端发送的连接请求如果在网络中滞留，那么就会隔很长一段时间才能收到服务器端发回的连接确认。客户端等待一个超时重传时间之后，就会重新请求连接。但是这个滞留的连接请求最后还是会到达服务器，如果不进行三次握手，那么服务器就会打开两个连接。如果有第三次握手，客户端会忽略服务器之后发送的对滞留连接请求的连接确认，不进行第三次握手，因此就不会再次打开连接。
 
-### 为什么A在TIME-WAIT状态必须等待2MSL的时间？
+### 为什么在TIME-WAIT状态必须等待2MSL的时间？
 
 MSL最长报文段寿命Maximum Segment Lifetime，MSL=2
 
@@ -2370,6 +552,33 @@ MSL最长报文段寿命Maximum Segment Lifetime，MSL=2
 ## 大量Time—wait 怎么解决
 
 解决思路： 让服务器能够快速回收和重用那些TIME_WAIT的资源。
+
+## TIME_WAIT的快速回收
+
+https://www.cnblogs.com/pangblog/p/3400297.html
+
+Linux实现了一个TIME_WAIT状态快速回收的机制，即无需等待两倍的MSL这么久的时间，而是等待一个Retrans时间即释放，也就是等待一个重传时间(一般超级短，以至于你都来不及能在netstat -ant中看到TIME_WAIT状态)随即释放。释放了之后，一个连接的tuple元素信息就都没有了，而此时，新建立的TCP却面临着危险，什么危险呢？即：
+1.可能被之前迟到的FIN包给终止的危险；
+2.被之前连接劫持的危险；
+
+## TIME_WAIT重用
+
+如果说TIME_WAIT(输入法切换太烦人了，后面简称TW)回收只是一种特定系统的优化实现的话，那么TW重用则有相关的规范，即：如果能保证以下任意一点，一个TW状态的四元组(即一个socket连接)可以重新被新到来的SYN连接使用：
+**1.初始序列号比TW老连接的末序列号大**
+**2.如果使能了时间戳，那么新到来的连接的时间戳比老连接的时间戳大**
+
+
+
+## 从外部干掉TIME_WAIT
+
+TIME_WAIT状态时则一个阑尾！Linux系统上，除了使能recycle tw，在Linux系统上你无法更简单地缩短TW状态的时间，但是80%的问题却都是由TW状态引发，在Windows系统上，你需要在注册表添加一个隐式的项，稍微拼写错误都会引发沉默的失败！TW确实让人生气，因此我一直都希望干掉TW状态的连接，特别是干掉服务端TW状态的连接！我们可以通过TCP的RESET来干死TW连接。这个怎么说呢？
+    根据TCP规范，收到任何的发送到未侦听端口或者序列号乱掉(窗口外)的数据，都要回执以RESET，这就是可以利用的！一个连接等待在TW，它自身无能为力，但是可以从外部间接杀掉它！具体来讲就是利用了IP_TRANSPARENT这个socket选项，它可以bind不属于本地的地址，因此可以从任意机器绑定TW连接的peer地址以及端口，然后发起一个连接，TW连接收到后由于序列号乱序会直接发送一个ACK，该ACK会回到TW连接的peer处，由于99%的可能该peer已经释放了连接(对端由于不能收到FIN-ACK的ACK，进而不放心ACK是否已经到达对端，等待MSL以便所有的老数据均已经丢失)，因此peer由于没有该连接会回复RESET，TW连接收到RESET后会释放连接，进而为后续的连接腾出地方！
+
+
+
+## Linux实现Tips
+
+Linux照顾到了一种特殊情况，即杀死进程的情况，在系统kill进程的时候，会直接调用连接的close函数单方面关闭一个方向的连接，然后并不会等待对端关闭另一个方向的连接进程即退出。现在的问题是，TCP规范和UNIX进程的文件描述符规范直接冲突！进程关闭了，套接字就要关闭，但是TCP是全双工的，你不能保证对端也在同一个时刻同意并且实施关闭动作，既然连接不能关闭，作为文件描述符，进程就不会关闭得彻底！所以，Linux使用了一种“子状态”的机制，即在进程退出的时候，单方面发送FIN，然后不等后续的关闭序列即将连接拷贝到一个占用资源更少的TW套接字，状态直接转入TIMW_WAIT，此时记录一个子状态FIN_WAIT_2，接下来的套接字就和原来的属于进程描述符的连接没有关系了。等到新的连接到来的时候，直接匹配到这个主状态为TW，子状态为FIN_WAIT_2的TW连接上，它负责处理FIN，FIN ACK等数据。
 
 ## **大量CLOSE_WAIT\** 怎么解决
 
@@ -2525,7 +734,7 @@ DHCP 工作过程如下：
 3. 如果客户端选择了某个 DHCP 服务器提供的信息，那么就发送 Request 报文给该 DHCP 服务器。
 4. DHCP 服务器发送 Ack 报文，表示客户端此时可以使用提供给它的信息。
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/23219e4c-9fc0-4051-b33a-2bd95bf054ab.jpg)
+![img](/Users/ano/Desktop/notes/image/23219e4c-9fc0-4051-b33a-2bd95bf054ab.jpg)
 
 
 
@@ -2567,6 +776,11 @@ NAT(Network Address Translation，网络地址转换), 用来将内网地址和�
     这是最常用的NAT技术，也是IPv4能够维持到今天的最重要的原因之一，它提供了一种多对一的方式，对多个内网IP地址，边界路由可以给他们分配一个外网IP，利用这个外网IP的不同端口和外部进行通信。
 
   
+
+
+
+
+
 
 
 
@@ -2872,7 +1086,7 @@ get, post, option, head,put,delete,connect, trace
 
 ## HTTP 首部
 
-## ![img](http://dl.iteye.com/upload/attachment/0069/3451/412b4451-2738-3ebc-b1f6-a0cc13b9697b.jpg)
+## ![img](/Users/ano/Desktop/notes/image/412b4451-2738-3ebc-b1f6-a0cc13b9697b.jpg)
 
 ## **HTTPS与HTTP的区别**
 
@@ -2948,10 +1162,6 @@ https://www.jianshu.com/p/7158568e4867
 2. 浏览器拿到服务器的IP地址后，会向它发送HTTP请求。HTTP请求经由一层层的处理、封装、发出之后，最终经由网络到达服务器，建立TCP/IP连接，服务器接收到请求并开始处理。
 3. 服务器构建响应，再经由一层层的处理、封装、发出后，到达客户端，浏览器处理请求。
 4. 浏览器开始渲染页面，解析HTML，构建render树，根据render树的节点和CSS的对应关系，进行布局，绘制页面。
-
-
-
-
 
 # WEB 攻防
 
@@ -3035,7 +1245,53 @@ SYN Flood攻击正是利用了TCP连接的三次握手，假设一个用户向�
 
 　　我称这种策略为“牺牲”策略，基于SYN Flood攻击代码的一个缺陷，我们重新来分析一下SYN Flood攻击者的流程：SYN Flood程序有两种攻击方式，基于IP的和基于域名的，前者是攻击者自己进行域名解析并将IP地址传递给攻击程序，后者是攻击程序自动进行域名解析，但是它们有一点是相同的，就是一旦攻击开始，将不会再进行域名解析，我们就是要利用这一点，假设一台服务器在受到SYN Flood攻击后迅速更换自己的IP地址，那么攻击者仍在不断攻击的只是一个空的IP地址，并没有任何主机，而管理员只需将DNS解析更改到新的IP地址就能在很短的时间内恢复用户通过域名进行的正常访问，这种做法取决于DNS的刷新时间。为了迷惑攻击者，我们甚至可以放置一台“牺牲”服务器，对攻击数据流进行牵引。
 
-　　同样的原因，在众多的负载均衡架构中，基于DNS解析的负载均衡本身就拥有对SYN Flood的免疫力，基于DNS解析的负载均衡能将用户的请求分配到不同IP的服务器主机上，攻击者的一次攻击永远只能是其中一台服务器，虽然说攻击者也能不断去进行DNS请求来持续对用户的攻击，但是这样增加了攻击者的攻击强度，同时由于过多的DNS请求，可以帮助管理员查找到攻击者的地址，这主要是由于DNS请求需要返回数据，而这个数据是很难被伪装的。
+　　同样的原因，在众多的负载均衡架构中，基于DNS解析的负载均衡本身就拥有对SYN Flood的免疫力，基于DNS解析的负载均衡能将用户的请求分配到不同IP的服务器主机上，攻击者的一次攻击永远只能是其中一台服务器，虽然说攻击者也能不断去进行DNS请求来持续对用户的攻击，但是这样增加了攻击者的攻击强度，同时由于过多的DNS请求，可以帮助管理员查找到攻击者的地址，这主要是由于DNS请求需要返回数据，而这个数据是很难被伪装的
+
+
+
+## DNS劫持” https://juejin.im/post/6844903863623876622
+
+### DNS劫持 vs HTTP劫持
+
+开始正式介绍DNS劫持之前，先与HTTP劫持做一个比较，可能有助于有些同学对下文更容易理解更深入一点。
+
+DNS劫持现象：你输入一个google.com网址，出来的是百度的页面
+
+HTTP劫持现象：访问着github的页面，右下角出现了一个格格不入的广告弹窗
+
+
+
+## DNS
+
+注：一般的网站会选择放在虚拟主机，且在主机上放置了很多个网站，而每个网站绑定1个或以上域名。虽然主机上有多个站点，但当用户访问某个站点时，服务器会根据http报文信息（域名），访问对应站点的部署目录，从而实现一台服务器上配置多个站点，即使有多个网站，也不会相互干扰。但使用IP访问，主机不知道用户访问的具体目录，请求便会出现异常情况。）
+
+![image-20200903221251206](/Users/ano/Desktop/notes/image/image-20200903221251206.png)
+
+
+
+
+
+**1.本机DNS劫持**
+
+攻击者通过某些手段使用户的计算机感染上木马病毒，或者恶意软件之后，恶意修改本地DNS配置，比如修改本地hosts文件，缓存等
+
+**2. 路由DNS劫持**
+
+很多用户默认路由器的默认密码，攻击者可以侵入到路由管理员账号中，修改路由器的默认配置
+
+**3.攻击DNS服务器**
+
+直接攻击DNS服务器，例如对DNS服务器进行DDOS攻击，可以是DNS服务器宕机，出现异常请求，还可以利用某些手段感染dns服务器的缓存，使给用户返回来的是恶意的ip地址
+
+**1.加强本地计算机病毒检查，开启防火墙等，防止恶意软件，木马病毒感染计算机**
+
+**2.改变路由器默认密码，防止攻击者修改路由器的DNS配置指向恶意的DNS服务器**
+
+**3.企业的话可以准备两个以上的域名，一旦一个域名挂掉，还可以使用另一个**
+
+**4.用HTTP DNS 代替 Local DNS**
+
+
 
 # NGINX
 
@@ -3234,7 +1490,7 @@ Unix 有五种 I/O 模型：
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);Copy to clipboardErrorCopied
 ```
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492928416812_4.png)
+![img](/Users/ano/Desktop/notes/image/1492928416812_4.png)
 
 
 
@@ -3244,7 +1500,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
 由于 CPU 要处理更多的系统调用，因此这种模型的 CPU 利用率比较低。
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492929000361_5.png)
+![img](/Users/ano/Desktop/notes/image/1492929000361_5.png)
 
 
 
@@ -3256,7 +1512,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
 如果一个 Web 服务器没有 I/O 复用，那么每一个 Socket 连接都需要创建一个线程去处理。如果同时有几万个连接，那么就需要创建相同数量的线程。相比于多进程和多线程技术，I/O 复用不需要进程线程创建和切换的开销，系统开销更小。
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492929444818_6.png)
+![img](/Users/ano/Desktop/notes/image/1492929444818_6.png)
 
 
 
@@ -3266,7 +1522,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
 相比于非阻塞式 I/O 的轮询方式，信号驱动 I/O 的 CPU 利用率更高。
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492929553651_7.png)
+![img](/Users/ano/Desktop/notes/image/1492929553651_7.png)
 
 
 
@@ -3276,7 +1532,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
 异步 I/O 与信号驱动 I/O 的区别在于，异步 I/O 的信号是通知应用进程 I/O 完成，而信号驱动 I/O 的信号是通知应用进程可以开始 I/O。
 
-![img](https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/1492930243286_8.png)
+![img](/Users/ano/Desktop/notes/image/1492930243286_8.png)
 
 
 
@@ -3464,7 +1720,7 @@ spring bean 容器的生命周期流程如下：
 
 AOP(Aspect-Oriented Programming), 即 面向切面编程, 它与 OOP( Object-Oriented Programming, 面向对象编程) 相辅相成, 提供了与 OOP 不同的抽象软件结构的视角.在 OOP 中, 我们以类(class)作为我们的基本单元, 而 AOP 中的基本单元是 Aspect(切面)
 
-![preview](https://pic4.zhimg.com/v2-da46bf7e930122cfe63bbe21deb3c5a7_r.jpg)
+![preview](/Users/ano/Desktop/notes/image/v2-da46bf7e930122cfe63bbe21deb3c5a7_r.jpg)
 
 
 
@@ -3481,7 +1737,7 @@ AOP(Aspect-Oriented Programming), 即 面向切面编程, 它与 OOP( Object-Ori
 5. JoinPoint - JoinPoint 是应用程序中的特定点，例如方法执行，异常处理，更改对象变量值等。在 Spring AOP 中，JoinPoint 始终是方法的执行器。
 
    
-   
+  
    ### **有哪些类型的通知（Advice）？**
 
 - Before - 这些类型的 Advice 在 joinpoint 方法之前执行，并使用 @Before 注解标记进行配置。
@@ -3795,6 +2051,75 @@ public class EmployeeService
 
    
 
+在TransactionDefinition类中，spring提供了**6种传播属**性，接下来分别用简单示例来说明。
+
+**PROPAGATION_REQUIRED**
+
+说明： 如果当前已经存在事务，那么加入该事务，如果不存在事务，创建一个事务，这是默认的传播属性值。
+
+**PROPAGATION_SUPPORTS**
+
+说明：如果当前已经存在事务，那么加入该事务，否则创建一个所谓的空事务（可以认为无事务执行）。
+
+**PROPAGATION_MANDATORY**
+
+说明：当前必须存在一个事务，否则抛出异常。
+
+**PROPAGATN_REQUIRES_NEW**
+
+说明：如果当前存在事务，先把当前事务相关内容封装到一个实体，然后重新创建一个新事务，接受这个实体为参数，用于事务的恢复。更直白的说法就是暂停当前事务(当前无事务则不需要)，创建一个新事务。 针对这种情况，两个事务没有依赖关系，可以实现新事务回滚了，但外部事务继续执行。
+
+**Propagation.NOT_SUPPORTED**
+
+说明：如果当前存在事务，挂起当前事务，然后新的方法在没有事务的环境中执行，没有spring事务的环境下，sql的提交完全依赖于 defaultAutoCommit属性值 。
+
+
+
+**6、 PROPAGATION_NEVER**
+
+说明： 如果当前存在事务，则抛出异常，否则在无事务环境上执行代码。
+
+**PROPAGATION_REQUIRES_NEW 实现原理**
+
+```java
+@Transactional
+public void service(){
+    serviceB();
+    try{
+        serviceA();
+    }catch(Exception e){
+    }
+}
+
+@Transactional(propagation=Propagation.REQUIRES_NEW)
+serviceA(){
+    do sql 1
+    1/0;
+    do sql 2
+}
+serviceB(){
+    do sql
+}
+```
+
+
+
+a. 创建事务状态对象，获取一个新的连接，重置连接的 autoCommit，fetchSize，timeout等属性
+
+b. 把连接绑定到ThreadLocal变量
+
+c. 挂起当前事务，把当前事务状态对象，连接等信息封装成一SuspendedResources对象，可用于恢复
+
+d. 创建新的事务状态对象，重新获取新的连接，重置新连接的 autoCommit，fetchSize，timeout等属性，同时，保存SuspendedResources对象，用于事务的恢复，把新的连接绑定到ThreadLocal变量（覆盖操作）
+
+e. 捕获到异常，回滚ThreadLocal中的连接，恢复连接参数，关闭连接，恢复SuspendedResources
+
+f. 提交ThreadLocal变量中的连接(导致serviceB被提交)，还原连接参数，关闭连接，连接归还数据源
+
+所以程序执行的结果就是 serviceA被回滚了，serviceB成功提交了
+
+<img src="/Users/ano/Desktop/notes/image/image-20200914194019274.png" alt="image-20200914194019274" style="zoom:50%;" />
+
 ## OthERs
 
 ##  1. [MyBatis缓存机制]
@@ -3816,9 +2141,128 @@ String luaScript = "if redis.call('get',KEYS[1]) == ARGV[1] then " + "return red
 
 # 常见
 
+非对称 **Diffe-Hellman 算法的密钥生成过程**
+
+使用该算法的前提：
+
+- 选取两个大数p和g并公开，其中p是一个素数，g是p的一个**模p本原单位根(primitive root module p)**，
+- Alice 有 a（private key）；Bob 有 b（private key）
+
+有了上面的前提，Diffe-Hellman 的算法流程如下：
+
+- 1、Alice 计算 A=g^a mod p，并发送 A 给 Bob；
+- 2、Bob 计算 B=g^b mod p，并发送 B 给 Alice；
+- 3、此时，Alice 计算 B^a mod p，Bob 计算 A^b mod p，
+- 4、分解可得，
+  **B^a mod p** = (g^b mod p)^a mod p = g^ab mod p = K；
+  **A^b mod p**= (g^a mod p)^b mod p = g^ab mod p = K;
+  于是，双方都有了一个共享密钥 K，关于 Diffe-Hellman 的数学原理，可参考这篇[英文帖子](https://security.stackexchange.com/questions/45963/diffie-hellman-key-exchange-in-plain-english)
+
+## LSM树原理探究
+
+磁盘顺序写的吞吐量甚至能够超过内存随即写的吞吐量。而LSM树正是利用了这一点，它通过将磁盘随机写操作转化为顺序写操作
+
+LSM树的结构是横跨内存和磁盘的，包含memtable、immutable memtable、SSTable等多个部分。
+
+顾名思义，memtable是在内存中的数据结构，用以保存最近的一些更新操作，当写数据到memtable中时，会先通过WAL的方式备份到磁盘中，以防数据因为内存掉电而丢失。
+
+> 预写式日志（Write-ahead logging，缩写 WAL）是关系数据库系统中用于提供原子性和持久性（ACID属性中的两个）的一系列技术。在使用WAL的系统中，所有的修改在提交之前都要先写入log文件中。
+
+memtable可以使用跳跃表或者搜索树等数据结构来组织数据以保持数据的有序性。当memtable达到一定的数据量后，memtable会转化成为immutable memtable，同时会创建一个新的memtable来处理新的数据。
+
+#### immutable memtable
+
+顾名思义，immutable memtable在内存中是不可修改的数据结构，它是将memtable转变为SSTable的一种中间状态。目的是为了在转存过程中不阻塞写操作。写操作可以由新的memtable处理，而不用因为锁住memtable而等待。
+
+#### SSTable
+
+SSTable(Sorted String Table)即为有序键值对集合，是LSM树组在磁盘中的数据的结构。如果SSTable比较大的时候，还可以根据键的值建立一个索引来加速SSTable的查询。下图是一个简单的SSTable结构示意：
+
+
+链接：https://juejin.im/post/6844903863758094343
 
 
 
+## 当我们在谈论HTTP队头阻塞时，我们在谈论什么？
+
+https://liudanking.com/tag/%E5%AF%B9%E5%A4%B4%E9%98%BB%E5%A1%9E/
+
+`HTTP/2`的RFC虽然写的很厚，但是总结起来就做了以下几件事：
+
+1. 通过TCP多路复用降低延迟；
+2. 单个TCP连接上允许乱序`request-response`，解决队头堵塞问题；
+3. 实现层面上，大部分浏览器要求`HTTP/2`必须开启TLS，一定程度上解决数据安全问题。
+
+![image-20200903215952679](/Users/ano/Desktop/notes/image/image-20200903215952679.png)
+
+管道化要求服务端按照请求发送的顺序返回响应（FIFO），原因很简单，HTTP请求和响应并没有序号标识，无法将乱序的响应与请求关联起来。当客户端在支持管道化时需要保持未收到响应的请求，当连接意外中断时，需要重新发送这部分请求。如果这个请求只是从服务器获取数据，那么并不会对资源造成任何影响，而如果是一个提交信息的请求如post请求，那么可能会造成资源多次提交从而改变资源，这是不允许的。而不会对服务器资源产生影响的请求有个专业名词叫做幂等请求。客户端在使用管道化的时候请求方式必须是幂等请求。
+
+https://cloud.tencent.com/developer/article/1509279
+
+
+
+HTTP/1.1通过pipelining管道技术实现一次性发送多个请求，以期提高吞吐和性能，如上图中的序列2。然而，这种技术在接收响应时，要求必须按照发送请求的顺序返回。如果，第一个请求被堵塞了，则后面的请求即使处理完毕了，也需要等待，如上图中的序列3。那么，HTTP/2是怎么解决这个问题的呢？那就是数据分帧：多个请求复用一个TCP连接，然后每个request-response都被拆分为若干个frame发送，这样即使一个请求被阻塞了，也不会影响其他请求，如上图序列4所示。问题完美解决了？准确说，只解决了一部分。如果队头阻塞的粒度是http request这个级别，那么HTTP/2 over TCP的确解决了HTTP/1.1中的问题。但是，HTTP/2目前实现层面上都是基于TCP（没错，HTTP从来没有说过必须通过TCP实现，你可以用它其他传输协议实现哟），因此HTTP/2并没有解决数据传输层的对头(包)阻塞问题。 <img src="/Users/ano/Desktop/notes/image/image-20200903220110863.png" alt="image-20200903220110863" style="zoom:50%;" />
+
+
+
+应用层无法解决传输层的问题。因此要完全解决队头阻塞问题，需要重新设计和实现传输层。目前而言，真正落地在应用的只看到Google的QUIC（https://www.chromium.org/quic）. 它的原理简单讲，就是使用UDP实现了一个可靠的多路复用传输层。我们知道UDP是面向数据报文的，数据包之间没有阻塞约束，QUIC就是充分利用这个特性解决传输层的队头阻塞问题的。当然，QUIC的协议实现有非常多的细节，而这方面Google确实做得非常好，如果你想进一步了解，可以关注他们的开源实现（https://chromium.googlesource.com/chromium/src/+/master/net/quic/）。
+
+## QUIC
+
+###  QUIC的优势
+
+**低延迟连接的建立**
+
+- 对于传统的HTTPS来说，对于其传输层的TCP握手就需要1.5个RTT，如果算上加密部分的话还需要产生额外的RTT，也就是说HTTPS进行一次完全的握手至少需要 3个以上的RTT。
+- 然而对于QUIC来说，如果是客户端首次连接到服务器，由于QUIC将传输与加密结合在一起的特性所在，一般来说正常情况下初次握手只需要1个RTT就可以完成握手；但是对于触发版本协商、证书无法解密等问题当然也会导致多个RTT的产生。
+- 而重复连接的情况下握手，如果在证书有效的情况下，客户端发送Hello包并不用等待回复就可以直接发数据加密包，也就是实现了传说中的0RTT。
+
+改进的拥塞控制
+
+- TCP 的拥塞控制实际上包含了四个算法：慢启动，拥塞避免，快速重传，快速恢复。
+- QUIC协议当前默认使用TCP的拥塞控制算法，并在其基础上进行了相应的改进；当然QUIC也支持其他的拥塞控制算法。主要的改进点有:
+  - 可插拔设计
+  - 单调递增的Packet Number
+  - 不允许Reneging
+  - 更多的Ack块
+  - 精确计算RTT时间
+
+无队头阻塞的多路复用
+
+- HTTP2的最大特性就是多路复用，而HTTP2最大的问题就是队头阻塞。
+- 首先了解下为什么会出现队头阻塞。比如HTTP2在一个TCP连接上同时发送3个Stream，其中第2个Stream丢了一个Packet，TCP为了保证数据可靠性，需要发送端重传丢失的数据包，虽然这时候第3个数据包已经到达接收端，但被阻塞了，这就是所谓的队头阻塞。
+- 而QUIC多路复用可以避免这个问题，因为QUIC的丢包、流控都是基于Stream的，所有Stream是相互独立的，一条Stream上的丢包，不会影响其他Stream的数据传输。
+
+前向纠错
+
+- QUIC协议的每个数据包除了本身的数据以外，会带有其他数据包的部分数据，在少量丢包的情况下，可以使用其他数据包的冗余数据完成数据组装而无需重传，从而提高数据的传输速度。具体实现类似于RAID5，将N个包的校验和（异或）建立一个单独的数据包发送，这样如果在这N个包中丢了一个包可以直接恢复出来，除此之外还可以用来校验包的正确性。
+
+连接迁移
+
+- 对于TCP协议来说，标识一个TCP连接需要4个参数，既来源IP、来源端口、目的IP和目的端口。其中的任一参数改变，TCP连接就需要重新创建。这对于传统网络来说影响不大，因为来源和目的IP相对固定。但是在无线网络中，情况就大不相同了。设备在移动过程中，可能会因为网络切换（如从WIFI网络切换到4G网络环境），导致TCP连接需要重新创建。
+- QUIC协议使用了UDP协议，不再需要这四元组参数。同时QUIC协议实现了自己的会话标记方式，称为连接UUID。当设备网络环境切换时，连接UUID不会发生变化，因此无需重新进行握手。
+
+QUIC在握手过程中使用Diffie-Hellman算法协商初始密钥，初始密钥依赖于服务器存储的一组配置参数，该参数会周期性的更新。初始密钥协商成功后，服务器会提供一个临时随机数，双方根据这个数再生成会话密钥。
+
+####     具体握手过程如下
+
+1. 客户端判断本地是否已有服务器的全部配置参数，如果有则直接跳转到(5)，否则继续
+2. 客户端向服务器发送inchoate client hello(CHLO)消息，请求服务器传输配置参数
+3. 服务器收到CHLO，回复rejection(REJ)消息，其中包含服务器的部分配置参数
+4. 客户端收到REJ，提取并存储服务器配置参数，跳回到(1)
+5. 客户端向服务器发送full client hello消息，开始正式握手，消息中包括客户端选择的公开数。此时客户端根据获取的服务器配置参数和自己选择的公开数，可以计算出初始密钥。
+6. 服务器收到full client hello，如果不同意连接就回复REJ，同(3)；如果同意连接，根据客户端的公开数计算出初始密钥，回复server hello(SHLO)消息，SHLO用初始密钥加密，并且其中包含服务器选择的一个临时公开数。
+7. 客户端收到服务器的回复，如果是REJ则情况同(4)；如果是SHLO，则尝试用初始密钥解密，提取出临时公开数
+8. 客户端和服务器根据临时公开数和初始密钥，各自基于SHA-256算法推导出会话密钥
+9.  双方更换为使用会话密钥通信，初始密钥此时已无用，QUIC握手过程完毕。之后会话密钥更新的流程与以上过程类似，只是数据包中的某些字段略有不同。
+
+## 浏览器渲染 https://juejin.im/entry/6844903503609987080
+
+1. 处理 HTML 标记并构建 DOM 树。
+2. 处理 CSS 标记并构建 CSSOM 树。
+3. 将 DOM 与 CSSOM 合并成一个渲染树。
+4. 根据渲染树来布局，以计算每个节点的几何信息。
+5. 将各个节点绘制到屏幕上。
 
 ## 字节序号
 
@@ -3887,6 +2331,62 @@ CAS 只对单个共享变量有效，当操作涉及跨多个共享变量时 CAS
 >
 > 2. 
 
+## 蓄水池抽样算法（Reservoir Sampling）
+
+**给定一个数据流，数据流长度N很大，且N直到处理完所有数据之前都不可知，请问如何在只遍历一遍数据（O(N)）的情况下，能够随机选取出m个不重复的数据。**
+
+这个场景强调了3件事：
+
+1. 数据流长度N很大且不可知，所以不能一次性存入内存。
+2. 时间复杂度为O(N)。
+3. 随机选取m个数，每个数被选中的概率为m/N。
+
+
+链接：https://www.jianshu.com/p/7a9ea6ece2af
+
+```cpp
+int[] reservoir = new int[m];
+
+// init
+for (int i = 0; i < reservoir.length; i++)
+{
+    reservoir[i] = dataStream[i];
+}
+
+for (int i = m; i < dataStream.length; i++)
+{
+    // 随机获得一个[0, i]内的随机整数
+    int d = rand.nextInt(i + 1);
+    // 如果随机整数落在[0, m-1]范围内，则替换蓄水池中的元素
+    if (d < m)
+    {
+        reservoir[d] = dataStream[i];
+    }
+}
+```
+
+算法思路大致如下：
+
+1. 如果接收的数据量小于m，则依次放入蓄水池。
+2. 当接收到第i个数据时，i >= m，在[0, i]范围内取以随机数d，若d的落在[0, m-1]范围内，则用接收到的第i个数据替换蓄水池中的第d个数据。
+3. 重复步骤2
+
+**当处理完所有的数据时，蓄水池中的每个数据都是以m/N的概率获得的。**
+
+**第i个接收到的数据最后能够留在蓄水池中的概率**=**第i个数据进入过蓄水池的概率*****之后第i个数据不被替换的概率**（第i+1到第N次处理数据都不会被替换）。
+
+1. 当i<=m时，数据直接放进蓄水池，所以**第i个数据进入过蓄水池的概率=1**。
+2. 当i>m时，在[1,i]内选取随机数d，如果d<=m，则使用第i个数据替换蓄水池中第d个数据，因此**第i个数据进入过蓄水池的概率=m/i**。
+3. 当i<=m时，程序从接收到第m+1个数据时开始执行替换操作，第m+1次x处理会替换池中数据的为m/(m+1)，会替换掉第i个数据的概率为1/m，则第m+1次处理替换掉第i个数据的概率为(m/(m+1))*(1/m)=1/(m+1)，不被替换的概率为1-1/(m+1)=m/(m+1)。依次，第m+2次处理不替换掉第i个数据概率为(m+1)/(m+2)...第N次处理不替换掉第i个数据的概率为(N-1)/N。所以，之后**第i个数据不被替换的概率=m/(m+1)\*(m+1)/(m+2)\*...\*(N-1)/N=m/N**。
+4. 当i>m时，程序从接收到第i+1个数据时开始有可能替换第i个数据。则参考上述第3点，**之后第i个数据不被替换的概率=i/N**。
+5. 结合第1点和第3点可知，当i<=m时，第i个接收到的数据最后留在蓄水池中的概率=1*m/N=m/N。结合第2点和第4点可知，当i>m时，第i个接收到的数据留在蓄水池中的概率=m/i*i/N=m/N。综上可知，**每个数据最后被选中留在蓄水池中的概率为m/N**。
+
+
+
+
+
+
+
 # Filter/ Listener/Intecepter
 
 
@@ -3938,789 +2438,6 @@ Example，A 网站和 B 网站是同一家公司的关联服务。现在要求�
 # REDIS
 
 
-
-## Redis 为何单线程
-
-Redis 是单进程单线程的模型，因为 Redis 完全是基于内存的操作，CPU 不是 Redis 的瓶颈，Redis 的瓶颈最有可能是机器内存的大小或者网络带宽。单线程容易实现，而且 CPU 不会成为瓶颈，那就顺理成章的采用单线程的方案了（毕竟采用多线程会有很多麻烦）。
-
-## Redis 和 Memcached 的区别
-
-- **存储方式上：**Memcache 会把数据全部存在内存之中，断电后会挂掉，数据不能超过内存大小。Redis 有部分数据存在硬盘上，这样能保证数据的持久性。
-- **数据支持类型上：**Memcache 对数据类型的支持简单，只支持简单的 key-value，而 Redis 支持五种数据类型。
-- **使用底层模型不同：**它们之间底层实现方式以及与客户端之间通信的应用协议不一样。Redis 直接自己构建了 VM 机制，因为一般的系统调用系统函数的话，会浪费一定的时间去移动和请求。
-- **Value 的大小：**Redis 可以达到 1GB，而 Memcache 只有 1MB。
-
-## Redis 为何这么快
-
-- Redis 完全基于内存，绝大部分请求是纯粹的内存操作，非常迅速，数据存在内存中。
-
-- 数据结构简单，对数据操作也简单。
-
-- 采用单线程，避免了不必要的上下文切换和竞争条件，不存在多线程导致的 CPU 切换，不用去考虑各种锁的问题，不存在加锁释放锁操作，没有死锁问题导致的性能消耗。
-
-- 使用多路复用 IO 模型，非阻塞 IO。
-
-  
-
-## Redis 的淘汰策略
-
-![image-20200623114805276](./image/image-20200623114805276.png)
-
-
-
-## Redis 的持久化机制了解吗？
-
-Redis 为了保证效率，数据缓存在了内存中，但是会周期性的把更新的数据写入磁盘或者把修改操作写入追加的记录文件中，以保证数据的持久化。
-
-Redis 的持久化策略有两种：
-
-- **RDB：**快照形式是直接把内存中的数据保存到一个 dump 的文件中，定时保存，保存策略。
-
-- **AOF：**把所有的对 Redis 的服务器进行修改的命令都存到一个文件里，命令的集合。
-
-  Redis 默认是快照 RDB 的持久化方式。
-
-当 Redis 重启的时候，它会优先使用 AOF 文件来还原数据集，因为 AOF 文件保存的数据集通常比 RDB 文件所保存的数据集更完整。你甚至可以关闭持久化功能，让数据只在服务器运行时存。
-
-## RDB 是怎么工作的？
-
-Redis 是会以快照"RDB"的形式将数据持久化到磁盘的一个二进制文件 dump.rdb。
-
-工作原理：当 Redis 需要做持久化时，Redis 会 fork 一个子进程，子进程将数据写到磁盘上一个临时 RDB 文件中。当子进程完成写临时文件后，将原来的 RDB 替换掉，这样的好处是可以 copy-on-write。
-
-优点：这种文件非常适合用于备份：比如，可以在最近的 24 小时内，每小时备份一次，并且在每个月的每一天也备份一个 RDB 文件。
-
-这样的话，即使遇上问题，也可以随时将数据集还原到不同的版本。RDB 非常适合灾难恢复。
-
-缺点：可能丢失数据。
-
-### save&BGSave
-
-https://draveness.me/whys-the-design-redis-bgsave-fork/
-
-其中 `SAVE` 命令在执行时会直接阻塞当前的线程，由于 Redis 是 [单线程](https://draveness.me/whys-the-design-redis-single-thread) 的，所以 `SAVE` 命令会直接阻塞来自客户端的所有其他请求，这在很多时候对于需要提供较强可用性保证的 Redis 服务都是无法接受的。我们往往需要 `BGSAVE` 命令在后台生成 Redis 全部数据对应的 RDB 文件，当我们使用 `BGSAVE` 命令时，Redis 会立刻 `fork` 出一个子进程，子进程会执行『将内存中的数据以 RDB 格式保存到磁盘中』这一过程，而 Redis 服务在 `BGSAVE` 工作期间仍然可以处理来自客户端的请求。
-
-## Redis 为什么在使用 RDB 进行快照时会通过子进程的方式进行实现：
-
-1. 通过 `fork` 创建的子进程能够获得和父进程完全相同的内存空间，父进程对内存的修改对于子进程是不可见的，两者不会相互影响；
-2. 通过 `fork` 创建子进程时不会立刻触发大量内存的拷贝，内存在被修改时会以页为单位进行拷贝，这也就避免了大量拷贝内存而带来的性能问题；
-
-
-
-## AOF 怎么工作
-
-```java
-appendfsync yes   
-appendfsync always     #每次有数据修改发生时都会写入AOF文件。
-appendfsync everysec   #每秒钟同步一次，该策略为AOF的缺省策略。
-```
-
-AOF 可以做到全程持久化，只需要在配置中开启 appendonly yes。这样 Redis 每执行一个修改数据的命令，都会把它添加到 AOF 文件中，当 Redis 重启时，将会读取 AOF 文件进行重放，恢复到 Redis 关闭前的最后时刻。
-
-优点： 让 Redis 变得非常耐久。可以设置不同的 Fsync 策略，AOF的默认策略是每秒钟 Fsync 一次，在这种配置下，就算发生故障停机，也最多丢失一秒钟的数据。
-
-缺点：相同的数据集来说，AOF 的文件体积通常要大于 RDB 文件的体积。根据所使用的 Fsync 策略，AOF 的速度可能会慢于 RDB。
-
-https://www.cnblogs.com/cc11001100/p/6487158.html
-
-so 
-
-如果你非常关心你的数据，但仍然可以承受数分钟内的数据丢失，那么可以只使用 RDB 持久化。
-
-AOF 将 Redis 执行的每一条命令追加到磁盘中，处理巨大的写入会降低Redis的性能。
-
-数据库备份和灾难恢复：定时生成 RDB 快照非常便于进行数据库备份，并且 RDB 恢复数据集的速度也要比 AOF 恢复的速度快。当然了，Redis 支持同时开启 RDB 和 AOF，系统重启后，Redis 会优先使用 AOF 来恢复数据，这样丢失的数据会最少。
-
-AOF 后台重写
-
-当子进程在执行 AOF 重写时， 主进程需要执行以下三个工作：
-
-1. 处理命令请求。
-2. 将写命令追加到现有的 AOF 文件中。
-3. 将写命令追加到 AOF 重写缓存中。
-
-这样一来可以保证：
-
-1. 现有的 AOF 功能会继续执行，即使在 AOF 重写期间发生停机，也不会有任何数据丢失。
-2. 所有对数据库进行修改的命令都会被记录到 AOF 重写缓存中。
-
-## Redis 雪崩了解吗?
-
-同一时间大面积失效，瞬间 Redis 跟没有一样.
-
-Solution: 在批量往 Redis 存数据的时候，把每个 Key 的失效时间都加个随机值就好了，这样可以保证数据不会再同一时间大面积失效。
-
-缓存雪崩的事前事中事后的解决方案如下。
-
-- 事前：redis 高可用，主从+哨兵，redis cluster，避免全盘崩溃。
-- 事中：本地 ehcache 缓存 + hystrix 限流&降级，避免 MySQL 被打死。
-- 事后：redis 持久化，一旦重启，自动从磁盘上加载数据，快速恢复缓存数据。
-
-
-
-## 缓存穿透和击穿?
-
-缓存穿透是指缓存和数据库中都没有的数据，而用户（黑客）不断发起请求。
-
-example : id 都是从 1 自增的，如果发起 id=-1 的数据或者 id 特别大不存在的数据，这样的不断攻击导致数据库压力很大，严重会击垮数据库。
-
-solution : 在接口层增加校验，比如用户鉴权，参数做校验，不合法的校验直接 return，比如 id 做基础校验，id<=0 直接拦截。布隆过滤器（Bloom Filter）也能很好的预防缓存穿透的发生。
-
-缓存击穿指一个 Key 非常热点，在不停地扛着大量的请求，大并发集中对这一个点进行访问，当这个 Key 在失效的瞬间，持续的大并发直接落到了数据库上，就在这个 Key 的点上击穿了缓存。
-
-solution ： 设置热点数据永不过期，或者加上互斥锁就搞定了
-
-![image-20200710000746609](./image/image-20200710000746609.png)
-
-
-
-## REDIS   HA 
-
-持久化、复制、哨兵和集群，其主要作用和解决的问题是：
-
-- 持久化：持久化是最简单的高可用方法(有时甚至不被归为高可用的手段)，主要作用是数据备份，即将数据存储在硬盘，保证数据不会因进程退出而丢失。
-- 复制：复制是高可用Redis的基础，哨兵和集群都是在复制基础上实现高可用的。复制主要实现了数据的多机备份，以及对于读操作的负载均衡和简单的故障恢复。缺陷：故障恢复无法自动化；写操作无法负载均衡；存储能力受到单机的限制。
-- 哨兵：在复制的基础上，哨兵实现了自动化的故障恢复。缺陷：写操作无法负载均衡；存储能力受到单机的限制。
-- 集群：通过集群，Redis解决了写操作无法负载均衡，以及存储能力受到单机限制的问题，实现了较为完善的高可用方案。
-
-### 主从
-
-#### 主从复制过程/作用？ https://zhuanlan.zhihu.com/p/60239657
-
-复制过程：                                      
-
-- 从节点执行 slaveof [masterIP] [masterPort]，保存主节点信息。
-- 从节点中的定时任务发现主节点信息，建立和主节点的 Socket 连接。
-- 从节点发送 Ping 信号，主节点返回 Pong，两边能互相通信。
-- 连接建立后，主节点将所有数据发送给从节点（数据同步）。
-- 主节点把当前的数据同步给从节点后，便完成了复制的建立过程。接下来，主节点就会持续的把写命令发送给从节点，保证主从数据一致性。
-- ![image-20200623151253153](./image/image-20200623151253153.png)
-
-#### **psync 命令需要 3 个组件支持：**
-
-1.主从节点各自复制偏移量
-2.主节点复制积压缓冲区
-3.主节点运行 ID
-
-#### 主从复制会存在以下问题：
-
-- 一旦主节点宕机，从节点晋升为主节点，同时需要修改应用方的主节点地址，还需要命令所有从节点去复制新的主节点，整个过程需要人工干预。
-
-- 主节点的写能力受到单机的限制。
-
-- 主节点的存储能力受到单机的限制。
-
-- 原生复制的弊端在早期的版本中也会比较突出，比如：Redis 复制中断后，从节点会发起 psync。
-  此时如果同步不成功，则会进行全量同步，主库执行全量备份的同时，可能会造成毫秒或秒级的卡顿。
-
-  
-
-  #### **主从复制的作用**
-
-  主从复制的作用主要包括：
-
-  1. 数据冗余：主从复制实现了数据的热备份，是持久化之外的一种数据冗余方式。
-  2. 故障恢复：当主节点出现问题时，可以由从节点提供服务，实现快速的故障恢复；实际上是一种服务的冗余。
-  3. 负载均衡：在主从复制的基础上，配合读写分离，可以由主节点提供写服务，由从节点提供读服务（即写Redis数据时应用连接主节点，读Redis数据时应用连接从节点），分担服务器负载；尤其是在写少读多的场景下，通过多个从节点分担读负载，可以大大提高Redis服务器的并发量。
-  4. 高可用基石：除了上述作用以外，主从复制还是哨兵和集群能够实施的基础，因此说主从复制是Redis高可用的基础。
-
-  
-
-## Redis 的过期策略是如何实现的？
-
-redisDb 结构的 expire 字典（过期字典）保存了所有键的过期时间
-
-过期字典的键是一个指向键空间中的某个键对象的指针
-
-过期字典的值保存了键所指向的数据库键的过期时间
-
-![image-20200728015102720](./image/image-20200728015102720.png)
-
-### 哨兵
-
-#### 哨兵有哪些功能
-
-Redis Sentinel（哨兵）主要功能包括**主节点存活检测、主从运行情况检测、自动故障转移、主从切换**。Redis Sentinel 最小配置是一主一从。Redis 的 Sentinel 系统可以用来管理多个 Redis 服务器。
-
-该系统可以执行以下四个任务：
-
-- **监控：**不断检查主服务器和从服务器是否正常运行。
-
-- **通知：**当被监控的某个 Redis 服务器出现问题，Sentinel 通过 API 脚本向管理员或者其他应用程序发出通知。
-
-- **自动故障转移：**当主节点不能正常工作时，Sentinel 会开始一次自动的故障转移操作，它会将与失效主节点是主从关系的其中一个从节点升级为新的主节点，并且将其他的从节点指向新的主节点，这样人工干预就可以免了。
-
-- **配置提供者：**在 Redis Sentinel 模式下，客户端应用在初始化时连接的是 Sentinel 节点集合，从中获取主节点的信息。
-
-  
-
-#### 哨兵工作原理 https://juejin.im/post/5b7d226a6fb9a01a1e01ff64
-
-![image-20200623200842696](./image/image-20200623200842696.png)
-
-哨兵系统的搭建过程，有几点需要注意：
-
-（1）哨兵系统中的主从节点，与普通的主从节点并没有什么区别，故障发现和转移是由哨兵来控制和完成的。
-
-（2）哨兵节点本质上是redis节点。
-
-（3）每个哨兵节点，只需要配置监控主节点，便可以自动发现其他的哨兵节点和从节点。
-
-（4）在哨兵节点启动和故障转移阶段，各个节点的配置文件会被重写(config rewrite)。
-
-
-
-##### 哨兵节点支持的命令
-
-哨兵节点作为运行在特殊模式下的redis节点，其支持的命令与普通的redis节点不同。在运维中，我们可以通过这些命令查询或修改哨兵系统；不过更重要的是，哨兵系统要实现故障发现、故障转移等各种功能，离不开哨兵节点之间的通信，而通信的很大一部分是通过哨兵节点支持的命令来实现的。下面介绍哨兵节点支持的主要命令。
-
-（1）基础查询：通过这些命令，可以查询哨兵系统的拓扑结构、节点信息、配置信息等。
-
-- info sentinel：获取监控的所有主节点的基本信息
-- sentinel masters：获取监控的所有主节点的详细信息
-- sentinel master mymaster：获取监控的主节点mymaster的详细信息
-- sentinel slaves mymaster：获取监控的主节点mymaster的从节点的详细信息
-- sentinel sentinels mymaster：获取监控的主节点mymaster的哨兵节点的详细信息
-- sentinel get-master-addr-by-name mymaster：获取监控的主节点mymaster的地址信息，前文已有介绍
-- sentinel is-master-down-by-addr：哨兵节点之间可以通过该命令询问主节点是否下线，从而对是否客观下线做出判断
-
-（2）增加/移除对主节点的监控
-
-sentinel monitor mymaster2 192.168.92.128 16379 2：与部署哨兵节点时配置文件中的sentinel monitor功能完全一样，不再详述
-
-sentinel remove mymaster2：取消当前哨兵节点对主节点mymaster2的监控
-
-（3）强制故障转移
-
-sentinel failover mymaster：该命令可以**强制对****mymaster****执行故障转移，**即便当前的主节点运行完好；例如，如果当前主节点所在机器即将报废，便可以提前通过failover命令进行故障转移。
-
-## Redis 集群
-
-![image-20200718220229933](./image/image-20200718220229933.png)
-
-这里要先将节点握手讲清楚。我们让两个redis节点之间进行通信的时候，需要在客户端执行下面一个命令
-
-```
-127.0.0.1:7000>cluster meet 127.0.0.1:7001
-```
-
-如下图所示
-![img](https://img2018.cnblogs.com/blog/725429/201908/725429-20190829164714480-362698612.png)
-
-意思很简单，让7000节点和7001节点知道彼此存在！
-在握手成功后，连个节点之间会**定期**发送ping/pong消息，交换**数据信息**，如下图所示。
-![img](https://img2018.cnblogs.com/blog/725429/201908/725429-20190829164722650-2064735559.png)
-
-在这里，我们需要关注三个重点。
-
-- (1)交换什么数据信息
-- (2)数据信息究竟多大
-- (3)定期的频率什么样
-
-*到底在交换什么数据信息？*
-交换的数据信息，由消息体和消息头组成。
-消息体无外乎是一些节点标识啊，IP啊，端口号啊，发送时间啊。
-我们来看消息头，结构如下
-![img](https://img2018.cnblogs.com/blog/725429/201908/725429-20190829164739879-973731722.jpg)
-
-注意看红框的内容，type表示消息类型。
-另外，消息头里面有个myslots的char数组，长度为16383/8，这其实是一个bitmap,每一个位代表一个槽，如果该位为1，表示这个槽是属于这个节点的。
-
-**Failover的流程**
-
-一、主观下线
-
-集群中每个节点都会定期向其他节点发送ping消息，接收节点回复pong消息作为响应。如果在cluster-node-timeout时间内通信一直失败，则发送节点会认为接收节点存在故障，把接收节点标记为主观下线（pfail）状态。
-
-
-二、客观下线
-
-当某个节点判断另一个节点主观下线后，相应的节点状态会跟随消息在集群内传播。通过Gossip消息传播，集群内节点不断收集到故障节点的下线报告。当半数以上持有槽的主节点都标记某个节点是主观下线时，触发客观下线流程。
-
-集群中的节点每次接收到其他节点的pfail状态，都会尝试触发客观下线，流程说明：
-
-\1. 首先统计有效的下线报告数量，如果小于集群内持有槽的主节点总数的一半则退出。
-
-\2. 当下线报告大于槽主节点数量一半时，标记对应故障节点为客观下线状态。
-
-\3. 向集群广播一条fail消息，通知所有的节点将故障节点标记为客观下线，fail消息的消息体只包含故障节点的ID。广播fail消息是客观下线的最后一步，它承担着非常重要的职责：
-
-​	\1. 通知集群内所有的节点标记故障节点为客观下线状态并立刻生效。
-
-​	\2. 通知故障节点的从节点触发故障转移流程。 
-
-故障切换
-
-故障节点变为客观下线后，如果下线节点是持有槽的主节点则需要在它的从节点中选出一个替换它，从而保证集群的高可用。下线主节点的所有从节点承担故障恢复的义务，当从节点通过内部定时任务发现自身复制的主节点进入客观下线时，将会触发故障切换流程。
-
-1.资格检查
-
-每个从节点都要检查最后与主节点断线时间，判断是否有资格替换故障的主节点。如果从节点与主节点断线时间超过cluster-node-time*cluster-slave-validity-factor，则当前从节点不具备故障转移资格。参数cluster-slavevalidity-factor用于从节点的有效因子，默认为10。
-
-2.准备选举时间
-
-当从节点符合故障切换资格后，更新触发切换选举的时间，只有到达该时间后才能执行后续流程。
-
-这里之所以采用延迟触发机制，主要是通过对多个从节点使用不同的延迟选举时间来支持优先级问题。复制偏移量越大说明从节点延迟越低，那么它应该具有更高的优先级来替换故障主节点。
-
-3.发起选举
-
-当从节点定时任务检测到达故障选举时间（failover_auth_time）到达后，发起选举流程如下：
-
-1> 更新配置纪元
-
-2> 广播选举消息
-
-在集群内广播选举消息（FAILOVER_AUTH_REQUEST），并记录已发送过消息的状态，保证该从节点在一个配置纪元内只能发起一次选举。
-
-4.选举投票
-
-只有持有槽的主节点才会处理故障选举消息（FAILOVER_AUTH_REQUEST），因为每个持有槽的节点在一个配置纪元内都有唯一的一张选票，当接到第一个请求投票的从节点消息时回复FAILOVER_AUTH_ACK消息作为投票，之后相同配置纪元内其他从节点的选举消息将忽略。
-
-Redis集群没有直接使用从节点进行领导者选举，主要因为从节点数必须大于等于3个才能保证凑够N/2+1个节点，将导致从节点资源浪费。使用集群内所有持有槽的主节点进行领导者选举，即使只有一个从节点也可以完成选举过程。
-
-5.替换主节点
-
-当从节点收集到足够的选票之后，触发替换主节点操作：
-
-1> 当前从节点取消复制变为主节点。
-
-2> 执行clusterDelSlot操作撤销故障主节点负责的槽，并执行clusterAddSlot把这些槽委派给自己。
-
-3> 向集群广播自己的pong消息，通知集群内所有的节点当前从节点变为主节点并接管了故障主节点的槽信息。
-
-## 布隆过滤器原理？
-
-利用高效的数据结构和算法快速判断出你这个 Key 是否在数据库中存在，不存在你 return 就好了，存在你就去查 DB 刷新 KV 再 return。
-
-### 场景
-
-- 数据库防止穿库。 Google Bigtable，HBase 和 Cassandra 以及 Postgresql 使用BloomFilter来减少不存在的行或列的磁盘查找。避免代价高昂的磁盘查找会大大提高数据库查询操作的性能。
-- 业务场景中判断用户是否阅读过某视频或文章，比如抖音或头条，当然会导致一定的误判，但不会让用户看到重复的内容。还有之前自己遇到的一个比赛类的社交场景中，需要判断用户是否在比赛中，如果在则需要更新比赛内容，也可以使用布隆过滤器，可以减少不在的用户查询db或缓存的次数。
-- 缓存宕机、缓存击穿场景，一般判断用户是否在缓存中，如果在则直接返回结果，不在则查询db，如果来一波冷数据，会导致缓存大量击穿，造成雪崩效应，这时候可以用布隆过滤器当缓存的索引，只有在布隆过滤器中，才去查询缓存，如果没查询到，则穿透到db。如果不在布隆器中，则直接返回。
-- WEB拦截器，如果相同请求则拦截，防止重复被攻击。用户第一次请求，将请求参数放入布隆过滤器中，当第二次请求时，先判断请求参数是否被布隆过滤器命中。可以提高缓存命中率。
-
-
-
-redis对事务是部分支持的，如果是在入队时报错，那么都不会执行；在非入队时报错，那么成功的就会成功执行。
-
-
-
-## redis事务三大特性：
-
-单独的隔离操作：事务中的所有命令都会序列化、按顺序地执行。事务在执行的过程中，不会被其他客户端发送来的命令请求所打断。
-没有隔离级别的概念：队列中的命令没有提交之前都不会实际的被执行，因为事务提交前任何指令都不会被实际执行，也就不存在”事务内的查询要看到事务里的更新，在事务外查询不能看到”这个让人万分头痛的问题
-不保证原子性：redis同一个事务中如果有一条命令执行失败，其后的命令仍然会被执行，没有回滚
-
-## 数据类型
-
-### sds
-
-- Redis 的字符串表示为 `sds` ，而不是 C 字符串（以 `\0` 结尾的 `char*`）。
-
-- 对比 C 字符串，sds有以下特性：
-
-  - 可以高效地执行长度计算（`strlen`）；
-  - 可以高效地执行追加操作（`append`）；
-  - 二进制安全；
-
-- `sds` 会为追加操作进行优化：加快追加操作的速度，并降低内存分配的次数，代价是多占用了一些内存，而且这些内存不会被主动释放
-
-  
-
-### 双端链表
-
-Redis 实现了自己的双端链表结构。双端链表还是 Redis 列表类型的底层实现之一， 当对列表类型的键进行操作 —— 比如执行 [RPUSH](http://redis.readthedocs.org/en/latest/list/rpush.html#rpush) 、 [LPOP](http://redis.readthedocs.org/en/latest/list/lpop.html#lpop) 或 [LLEN](http://redis.readthedocs.org/en/latest/list/llen.html#llen) 等命令时， 程序在底层操作的可能就是双端链表。
-
-双端链表主要有两个作用：
-
-- 作为 Redis 列表类型的底层实现之一；
-- 作为通用数据结构，被其他功能模块所使用；
-
-双端链表及其节点的性能特性如下：
-
-- 节点带有前驱和后继指针，访问前驱节点和后继节点的复杂度为 O(1) ，并且对链表的迭代可以在从表头到表尾和从表尾到表头两个方向进行；
-
-- 链表带有指向表头和表尾的指针，因此对表头和表尾进行处理的复杂度为 O(1) ；
-
-- 链表带有记录节点数量的属性，所以可以在 O(1) 复杂度内返回链表的节点数量（长度）；
-
-  
-
-### dict
-
- 大部分针对数据库的命令， 比如 [DBSIZE](http://redis.readthedocs.org/en/latest/server/dbsize.html#dbsize) 、 [FLUSHDB](http://redis.readthedocs.org/en/latest/server/flushdb.html#flushdb) 、 [RANDOMKEY](http://redis.readthedocs.org/en/latest/key/randomkey.html#randomkey) ， 等等， 都是构建于对字典的操作之上的； 而那些创建、更新、删除和查找键值对的命令， 也无一例外地需要在键空间上进行操作。dict也用作 Hash 类型键的底层实现之一；
-
-- 字典是由键值对构成的抽象数据结构。
-
-- Redis 中的数据库和哈希键都基于字典来实现。
-
-- Redis 字典的底层实现为哈希表，每个字典使用两个哈希表，一般情况下只使用 0 号哈希表，只有在 rehash 进行时，才会同时使用 0 号和 1 号哈希表。
-
-- 哈希表使用链地址法来解决键冲突的问题。
-
-- Rehash 可以用于扩展或收缩哈希表。
-
-- 对哈希表的 rehash 是分多次、渐进式地进行的。
-
-- 字典的 rehash 操作实际上就是执行以下任务：
-
-  1. 创建一个比 `ht[0]->table` 更大的 `ht[1]->table` ；
-  2. 将 `ht[0]->table` 中的所有键值对迁移到 `ht[1]->table` ；
-  3. 将原有 `ht[0]` 的数据清空，并将 `ht[1]` 替换为新的 `ht[0]` ；
-
-  
-
-### 跳跃表
-
-- 跳跃表是一种随机化数据结构，查找、添加、删除操作都可以在对数期望时间下完成。
-- 跳跃表目前在 Redis 的唯一作用，就是作为有序集类型的底层数据结构（之一，另一个构成有序集的结构是字典）。
-- 为了满足自身的需求，Redis 基于 William Pugh 论文中描述的跳跃表进行了修改，包括：
-  1. `score` 值可重复。
-  2. 对比一个元素需要同时检查它的 `score` 和 `memeber` 。
-  3. 每个节点带有高度为 1 层的后退指针，用于从表尾方向向表头方向迭代。
-
-### 整数集合（intset）
-
-* Intset 用于有序、无重复地保存多个整数值，会根据元素的值，自动选择该用什么长度的整数类型来保存元素。
-
-* 当一个位长度更长的整数值添加到 intset 时，需要对 intset 进行升级，新 intset 中每个元素的位长度，会等于新添加值的位长度，但原有元素的值不变。
-
-* 升级会引起整个 intset 进行内存重分配，并移动集合中的所有元素，这个操作的复杂度为 O(N)O(N) 。
-
-* Intset 只支持升级，不支持降级。
-
-* Intset 是有序的，程序使用二分查找算法来实现查找操作，复杂度为 O(lgN)O(lg⁡N) 。
-
-
-
-### Ziplist
-
-因为 ziplist 节约内存的性质， 哈希键、列表键和有序集合键初始化的底层实现皆采用 ziplist.
-
-ziplist 是由一系列特殊编码的内存块构成的列表，可以保存字符数组或整数值，同时是哈希键、列表键和有序集合键的底层实现之一。
-
-
-
-![image-20200708201423179](./image/image-20200708201423179.png)
-
-为什么Hash与List会使用ziplist来存储数据呢？
-
-因为
-
-1. ziplist会比hashtable与ziplist节省跟多的内存
-2. 内存中以连续块方式保存的数据比起hashtable与linkedlist使用的链表可以更快的载入缓存中
-3. 当ziplist的长度比较小的时候，从ziplist读写数据的效率比hashtable或者linkedlist的差异并不大。
-
-本质上，使用ziplist就是以时间换空间的一种优化，但是他的时间损坏小到几乎可以忽略不计，但却能带来可观的内存减少，所以满足条件时，Redis会使用ziplist作为Hash与List的存储结构。
-链接：https://www.jianshu.com/p/fc9d65b5bb9a
-
-### RedisObject
-
-![image-20200708200804376](./image/image-20200708200804376.png)
-
-### watch
-
-![image-20200709205220653](./image/image-20200709205220653.png)
-
-通过 `watched_keys` 字典， 如果程序想检查某个键是否被监视， 那么它只要检查字典中是否存在这个键即可； 如果程序要获取监视某个键的所有客户端， 那么只要取出键的值（一个链表）， 然后对链表进行遍历即可。
-
-在任何对数据库键空间（key space）进行修改的命令成功执行之后 （比如 [FLUSHDB](http://redis.readthedocs.org/en/latest/server/flushdb.html#flushdb) 、 [SET](http://redis.readthedocs.org/en/latest/string/set.html#set) 、 [DEL](http://redis.readthedocs.org/en/latest/key/del.html#del) 、 [LPUSH](http://redis.readthedocs.org/en/latest/list/lpush.html#lpush) 、 [SADD](http://redis.readthedocs.org/en/latest/set/sadd.html#sadd) 、 [ZREM](http://redis.readthedocs.org/en/latest/sorted_set/zrem.html#zrem) ，诸如此类）， `multi.c/touchWatchedKey` 函数都会被调用 —— 它检查数据库的 `watched_keys` 字典， 看是否有客户端在监视已经被命令修改的键， 如果有的话， 程序将所有监视这个/这些被修改键的客户端的 `REDIS_DIRTY_CAS` 选项打开
-
-当客户端发送 [EXEC](http://redis.readthedocs.org/en/latest/transaction/exec.html#exec) 命令、触发事务执行时， 服务器会对客户端的状态进行检查：
-
-- 如果客户端的 `REDIS_DIRTY_CAS` 选项已经被打开，那么说明被客户端监视的键至少有一个已经被修改了，事务的安全性已经被破坏。服务器会放弃执行这个事务，直接向客户端返回空回复，表示事务执行失败。
-- 如果 `REDIS_DIRTY_CAS` 选项没有被打开，那么说明所有监视键都安全，服务器正式执行事务。
-
-最后，当一个客户端结束它的事务时，无论事务是成功执行，还是失败， `watched_keys` 字典中和这个客户端相关的资料都会被清除。
-
-
-
-## 事务
-
-Redis 事务保证了其中的一致性（C）和隔离性（I），但并不保证原子性（A）和持久性（D）。
-
-A：
-
-单个 Redis 命令的执行是原子性的，但 Redis 没有在事务上增加任何维持原子性的机制，所以 Redis 事务的执行并不是原子性的。如果一个事务队列中的所有命令都被成功地执行，那么称这个事务执行成功。另一方面，如果 Redis 服务器进程在执行事务的过程中被停止 —— 比如接到 KILL 信号、宿主机器停机，等等，那么事务执行失败。当事务失败时，Redis 也不会进行任何的重试或者回滚动作。
-
-C:
-
-* 入队错误:带有不正确入队命令的事务不会被执行，也不会影响数据库的一致性。
-
-* 执行的过程中发生错误 : 比如说，对一个不同类型的 key 执行了错误的操作， 那么 Redis 只会将错误包含在事务的结果中， 这不会引起事务中断或整个失败，不会影响已执行事务命令的结果，也不会影响后面要执行的事务命令， 所以它对事务的一致性也没有影响。
-
-  
-
-* Redis 进程被终结： 如果 Redis 服务器进程在执行事务的过程中被其他进程终结，或者被管理员强制杀死，那么根据 Redis 所使用的持久化模式，可能有以下情况出现：
-
-  - 内存模式：如果 Redis 没有采取任何持久化机制，那么重启之后的数据库总是空白的，所以数据总是一致的。
-
-  - RDB 模式：在执行事务时，Redis 不会中断事务去执行保存 RDB 的工作，只有在事务执行之后，保存 RDB 的工作才有可能开始。所以当 RDB 模式下的 Redis 服务器进程在事务中途被杀死时，事务内执行的命令，不管成功了多少，都不会被保存到 RDB 文件里。恢复数据库需要使用现有的 RDB 文件，而这个 RDB 文件的数据保存的是最近一次的数据库快照（snapshot），所以它的数据可能不是最新的，但只要 RDB 文件本身没有因为其他问题而出错，那么还原后的数据库就是一致的。
-
-  - AOF 模式：因为保存 AOF 文件的工作在后台线程进行，所以即使是在事务执行的中途，保存 AOF 文件的工作也可以继续进行，因此，根据事务语句是否被写入并保存到 AOF 文件，有以下两种情况发生：
-
-    1）如果事务语句未写入到 AOF 文件，或 AOF 未被 SYNC 调用保存到磁盘，那么当进程被杀死之后，Redis 可以根据最近一次成功保存到磁盘的 AOF 文件来还原数据库，只要 AOF 文件本身没有因为其他问题而出错，那么还原后的数据库总是一致的，但其中的数据不一定是最新的。
-
-    2）如果事务的部分语句被写入到 AOF 文件，并且 AOF 文件被成功保存，那么不完整的事务执行信息就会遗留在 AOF 文件里，当重启 Redis 时，程序会检测到 AOF 文件并不完整，Redis 会退出，并报告错误。需要使用 redis-check-aof 工具将部分成功的事务命令移除之后，才能再次启动服务器。还原之后的数据总是一致的，而且数据也是最新的（直到事务执行之前为止）。
-
-    
-
-## 订阅与发布模式
-
-![image-20200709211009546](./image/image-20200709211009546.png)
-
-- 订阅信息由服务器进程维持的 `redisServer.pubsub_channels` 字典保存，字典的键为被订阅的频道，字典的值为订阅频道的所有客户端。
-- 当有新消息发送到频道时，程序遍历频道（键）所对应的（值）所有客户端，然后将消息发送到所有订阅频道的客户端上。
-- 订阅模式的信息由服务器进程维持的 `redisServer.pubsub_patterns` 链表保存，链表的每个节点都保存着一个 `pubsubPattern` 结构，结构中保存着被订阅的模式，以及订阅该模式的客户端。程序通过遍历链表来查找某个频道是否和某个模式匹配。
-- 当有新消息发送到频道时，除了订阅频道的客户端会收到消息之外，所有订阅了匹配频道的模式的客户端，也同样会收到消息。
-- 退订频道和退订模式分别是订阅频道和订阅模式的反操作。
-
-
-
-## LUA 脚本
-
-- 初始化 Lua 脚本环境需要一系列步骤，其中最重要的包括：
-  - 创建 Lua 环境。
-  - 载入 Lua 库，比如字符串库、数学库、表格库，等等。
-  - 创建 `redis` 全局表格，包含各种对 Redis 进行操作的函数，比如 `redis.call` 和 `redis.log` ，等等。
-  - 创建一个无网络连接的伪客户端，专门用于执行 Lua 脚本中的 Redis 命令。
-- Reids 通过一系列措施保证被执行的 Lua 脚本无副作用，也没有有害的写随机性：对于同样的输入参数和数据集，总是产生相同的写入命令。
-- [EVAL](http://redis.readthedocs.org/en/latest/script/eval.html#eval) 命令为输入脚本定义一个 Lua 函数，然后通过执行这个函数来执行脚本。
-- [EVALSHA](http://redis.readthedocs.org/en/latest/script/evalsha.html#evalsha) 通过构建函数名，直接调用 Lua 中已定义的函数，从而执行相应的脚本。
-
-## Redis 慢查询
-
-- 针对慢查询日志有三种操作，分别是查看、清空和获取日志数量：
-  - 查看日志：在日志链表中遍历指定数量的日志节点，复杂度为 O(N)O(N) 。
-  - 清空日志：释放日志链表中的所有日志节点，复杂度为 O(N)O(N) 。
-  - 获取日志数量：获取日志的数量等同于获取 `server.slowlog` 链表的数量，复杂度为 O(1)O(1) 。
-- Redis 用一个链表以 FIFO 的顺序保存着所有慢查询日志。
-- 每条慢查询日志以一个慢查询节点表示，节点中记录着执行超时的命令、命令的参数、命令执行时的时间，以及执行命令所消耗的时间等信息。
-
-## REDIS 数据库
-
-因为数据库本身是一个字典， 所以对数据库的操作基本上都是对字典的操作， 加上以下一些维护操作：
-
-- 更新键的命中率和不命中率，这个值可以用 [INFO](http://redis.readthedocs.org/en/latest/server/info.html#info) 命令查看；
-
-- 更新键的 LRU 时间，这个值可以用 [OBJECT](http://redis.readthedocs.org/en/latest/key/object.html#object) 命令来查看；
-
-- 删除过期键（稍后会详细说明）；
-
-- 如果键被修改了的话，那么将键设为脏（用于事务监视），并将服务器设为脏（等待 RDB 保存）；
-
-- 将对键的修改发送到 AOF 文件和附属节点，保持数据库状态的一致；
-
-  
-
-  在数据库中， 所有键的过期时间都被保存在 `redisDb` 结构的 `expires` 字典里：
-
-  通过 `expires` 字典， 可以用以下步骤检查某个键是否过期：
-
-  1. 检查键是否存在于 `expires` 字典：如果存在，那么取出键的过期时间；
-  2. 检查当前 UNIX 时间戳是否大于键的过期时间：如果是的话，那么键已经过期；否则，键未过期。
-
-  
-
-  我们知道了过期时间保存在 `expires` 字典里， 又知道了该如何判定一个键是否过期， 现在剩下的问题是， 如果一个键是过期的， 那它什么时候会被删除？
-
-  1. 定时删除：在设置键的过期时间时，创建一个定时事件，当过期时间到达时，由事件处理器自动执行键的删除操作。对内存是最友好的,对 CPU 时间是最不友好的,  目前 Redis 事件处理器对时间事件的实现方式 —— 无序链表， 查找一个时间复杂度为 O(N)O(N) —— 并不适合用来处理大量时间事件。
-  2. 惰性删除：放任键过期不管，但是在每次从 `dict` 字典中取出键值时，要检查键是否过期，如果过期的话，就删除它，并返回空；如果没过期，就返回键值。对 CPU 时间来说是最友好的.
-  3. 定期删除：每隔一段时间，对 `expires` 字典进行检查，删除里面的过期键.定期删除是这两种策略的一种折中：
-     - 它每隔一段时间执行一次删除操作，并通过限制删除操作执行的时长和频率，籍此来减少删除操作对 CPU 时间的影响。
-     - 另一方面，通过定期删除过期键，它有效地减少了因惰性删除而带来的内存浪费。
-
-Redis 使用的过期键删除策略是**惰性删除加上定期删除**， 这两个策略相互配合，可以很好地在合理利用 CPU 时间和节约内存空间之间取得平衡。
-
-
-
-## redis TTL实现原理
-
-### TTL存储的数据结构
-
- redis针对TTL时间有专门的dict进行存储，就是redisDb当中的dict *expires字段，dict顾名思义就是一个hashtable，key为对应的rediskey，value为对应的TTL时间。
-链接：https://www.jianshu.com/p/53083f5f2ddc
-https://juejin.im/post/6844903965927145479
-
-![image-20200804213323189](./image/image-20200804213323189.png)
-
->  图中过期字段和键空间中键对象有重复，实际中不会出现重复对象，键空间的键和过期字典的键都指向同一个键对象
-
-## 过期键会被保存在更新后的 RDB 文件、 AOF 文件或者重写后的 AOF 文件里面吗？
-
-### 更新后的 RDB 文件
-
-在创建新的 RDB 文件时，程序会对键进行检查，过期的键不会被写入到更新后的 RDB 文件中。因此，过期键对更新后的 RDB 文件没有影响。
-
-### AOF 文件
-
-在键已经过期，但是还没有被惰性删除或者定期删除之前，这个键不会产生任何影响，AOF 文件也不会因为这个键而被修改。当过期键被惰性删除、或者定期删除之后，程序会向 AOF 文件追加一条 `DEL` 命令，来显式地记录该键已被删除。
-
-### AOF 重写
-
-和 RDB 文件类似， 当进行 AOF 重写时， 程序会对键进行检查， 过期的键不会被保存到重写后的 AOF 文件。因此，过期键对重写后的 AOF 文件没有影响。
-
-### 复制
-
-当服务器带有附属节点时， 过期键的删除由主节点统一控制：
-
-- 如果服务器是主节点，那么它在删除一个过期键之后，会显式地向所有附属节点发送一个 `DEL` 命令。
-- 如果服务器是附属节点，那么当它碰到一个过期键的时候，它会向程序返回键已过期的回复，但并不真正的删除过期键。因为程序只根据键是否已经过期、而不是键是否已经被删除来决定执行流程，所以这种处理并不影响命令的正确执行结果。当接到从主节点发来的 `DEL` 命令之后，附属节点才会真正的将过期键删除掉。
-
-附属节点不自主对键进行删除是为了和主节点的数据保持绝对一致， 因为这个原因， 当一个过期键还存在于主节点时，这个键在所有附属节点的副本也不会被删除。这种处理机制对那些使用大量附属节点，并且带有大量过期键的应用来说，可能会造成一部分内存不能立即被释放，但是，因为过期键通常很快会被主节点发现并删除，所以这实际上也算不上什么大问题。
-
-- 数据库主要由 `dict` 和 `expires` 两个字典构成，其中 `dict` 保存键值对，而 `expires` 则保存键的过期时间。
-- 数据库的键总是一个字符串对象，而值可以是任意一种 Redis 数据类型，包括字符串、哈希、集合、列表和有序集。
-- `expires` 的某个键和 `dict` 的某个键共同指向同一个字符串对象，而 `expires` 键的值则是该键以毫秒计算的 UNIX 过期时间戳。
-- Redis 使用惰性删除和定期删除两种策略来删除过期的键。
-- 更新后的 RDB 文件和重写后的 AOF 文件都不会保留已经过期的键。
-- 当一个过期键被删除之后，程序会追加一条新的 `DEL` 命令到现有 AOF 文件末尾。
-- 当主节点删除一个过期键之后，它会显式地发送一条 `DEL` 命令到所有附属节点。
-- 附属节点即使发现过期键，也不会自作主张地删除它，而是等待主节点发来 `DEL` 命令，这样可以保证主节点和附属节点的数据总是一致的。
-- 数据库的 `dict` 字典和 `expires` 字典的扩展策略和普通字典一样。它们的收缩策略是：当节点的填充百分比不足 10% 时，将可用节点数量减少至大于等于当前已用节点数量。
-
-
-
-## Redis 分别提供了哪些持久化机制
-
-- RDB 将数据库的快照（snapshot）以二进制的方式保存到磁盘中。
-- AOF 则以协议文本的方式，将所有对数据库进行过写入的命令（及其参数）记录到 AOF 文件，以此达到记录数据库状态的目的。
-
-## RDB
-
-- `rdbSave` 会将数据库数据保存到 RDB 文件，并在保存完成之前阻塞调用者。
-
-- [SAVE](http://redis.readthedocs.org/en/latest/server/save.html#save) 命令直接调用 `rdbSave` ，阻塞 Redis 主进程； [BGSAVE](http://redis.readthedocs.org/en/latest/server/bgsave.html#bgsave) 用子进程调用 `rdbSave` ，主进程仍可继续处理命令请求。
-
-- [SAVE](http://redis.readthedocs.org/en/latest/server/save.html#save) 执行期间， AOF 写入可以在后台线程进行， [BGREWRITEAOF](http://redis.readthedocs.org/en/latest/server/bgrewriteaof.html#bgrewriteaof) 可以在子进程进行，所以这三种操作可以同时进行。
-
-- 为了避免产生竞争条件， [BGSAVE](http://redis.readthedocs.org/en/latest/server/bgsave.html#bgsave) 执行时， [SAVE](http://redis.readthedocs.org/en/latest/server/save.html#save) 命令不能执行。
-
-- 为了避免性能问题， [BGSAVE](http://redis.readthedocs.org/en/latest/server/bgsave.html#bgsave) 和 [BGREWRITEAOF](http://redis.readthedocs.org/en/latest/server/bgrewriteaof.html#bgrewriteaof) 不能同时执行。
-
-- 调用 `rdbLoad` 函数载入 RDB 文件时，不能进行任何和数据库相关的操作，不过订阅与发布方面的命令可以正常执行，因为它们和数据库不相关联。
-
-- RDB 文件的组织方式如下：
-
-  ```
-  +-------+-------------+-----------+-----------------+-----+-----------+
-  | REDIS | RDB-VERSION | SELECT-DB | KEY-VALUE-PAIRS | EOF | CHECK-SUM |
-  +-------+-------------+-----------+-----------------+-----+-----------+
-  
-                        |<-------- DB-DATA ---------->|
-  ```
-
-- 键值对在 RDB 文件中的组织方式如下：
-
-  ```
-  +----------------------+---------------+-----+-------+
-  | OPTIONAL-EXPIRE-TIME | TYPE-OF-VALUE | KEY | VALUE |
-  +----------------------+---------------+-----+-------+
-  ```
-
-  RDB 文件使用不同的格式来保存不同类型的值。
-  
-  
-
-## AOF
-
-
-
- AOF 文件的整个过程可以分为三个阶段：
-
-1. 命令传播：Redis 将执行完的命令、命令的参数、命令的参数个数等信息发送到 AOF 程序中。
-2. 缓存追加：AOF 程序根据接收到的命令数据，将命令转换为网络通讯协议的格式，然后将协议内容追加到服务器的 AOF 缓存中。
-3. 文件写入和保存：AOF 缓存中的内容被写入到 AOF 文件末尾，如果设定的 AOF 保存条件被满足的话， `fsync` 函数或者 `fdatasync`函数会被调用，将写入的内容真正地保存到磁盘中。
-
-Redis 目前支持三种 AOF 保存模式，它们分别是：
-
-1. `AOF_FSYNC_NO` ：不保存，
-
-   在这种模式下， SAVE 只会在以下任意一种情况中被执行：
-
-   - Redis 被关闭
-   - AOF 功能被关闭
-   - 系统的写缓存被刷新（可能是缓存已经被写满，或者定期保存操作被执行）
-
-2. `AOF_FSYNC_EVERYSEC` ：每一秒钟保存一次。SAVE 原则上每隔一秒钟就会执行一次， 因为 SAVE 操作是由后台子线程调用的， 所以它不会引起服务器主进程阻塞
-
-3. `AOF_FSYNC_ALWAYS` ：每执行一个命令保存一次。
-
-对于三种 AOF 保存模式， 它们对服务器主进程的阻塞情况如下：
-
-1. 不保存（`AOF_FSYNC_NO`）：写入和保存都由主进程执行，两个操作都会阻塞主进程。
-2. 每一秒钟保存一次（`AOF_FSYNC_EVERYSEC`）：写入操作由主进程执行，阻塞主进程。保存操作由子线程执行，不直接阻塞主进程，但保存操作完成的快慢会影响写入操作的阻塞时长。
-3. 每执行一个命令保存一次（`AOF_FSYNC_ALWAYS`）：和模式 1 一样。安全性是最高的， 但性能也是最差的
-
-- AOF 文件通过保存所有修改数据库的命令来记录数据库的状态。
-- AOF 文件中的所有命令都以 Redis 通讯协议的格式保存。
-- 不同的 AOF 保存模式对数据的安全性、以及 Redis 的性能有很大的影响。
-- AOF 重写的目的是用更小的体积来保存数据库状态，整个重写过程基本上不影响 Redis 主进程处理命令请求。
-- AOF 重写是一个有歧义的名字，实际的重写工作是针对数据库的当前值来进行的，程序既不读写、也不使用原有的 AOF 文件。
-- AOF 可以由用户手动触发，也可以由服务器自动触发。
-
-REDIS Server
-
-- 服务器经过初始化之后，才能开始接受命令。
-- 服务器初始化可以分为六个步骤：
-  1. 初始化服务器全局状态。
-  2. 载入配置文件。
-  3. 创建 daemon 进程。
-  4. 初始化服务器功能模块。
-  5. 载入数据。
-  6. 开始事件循环。
-- 服务器为每个已连接的客户端维持一个客户端结构，这个结构保存了这个客户端的所有状态信息。
-- 客户端向服务器发送命令，服务器接受命令然后将命令传给命令执行器，执行器执行给定命令的实现函数，执行完成之后，将结果保存在缓存，最后回传给客户端。
-
-## REDIS Hyperlog log
-
-
-
-链接：https://juejin.im/post/5d066d11e51d4510a50335bc
-
-场景： 统计一个集合中不重复的元素个数，比如日常需求场景有，统计页面的UV或者统计在线的用户数、注册IP数。。
-
-简单的做法就是记录集合中的所有不重复的 集合S，新来一个元素x，首先判断x在不在S中，如果不在，则将x加入到S，否则不记录。常用的SET数据结构就可以实现。
-
-但是这样实现，如果数据量越来越大，会造成什么问题？
-
-- 当统计的数据量变大时，相应的存储内存会线性增长。
-- 当集合S越大时，判断x元素是否在集合S中的所花的成本会越大。
-
-
-
-常用的基数计数有三种： B+树、bitmap、概率算法。
-
-- B+ 树。 B+ 树插入和查找效率比较高。可以快速查找元素是否存在，以及进行插入。如果要计算基数值（不重复的元素值），则只需要树的节点个数即可。但是依然存在没有节省内存空间的问题。
-- bitmap。 bitmap 是通过一个bit数组来存在特定数据的一种数据结构。基数计数则将每一个元素对应到bit数组的其中一位，比如Bit数组010010101，代表[1,4,6,8]。新加入的元素只需要已有的Bit数组和新加入的元素进行按位或计算。这种方式可以大大减少内存，如果存储1亿数据的话，大概只需要 100000000/8/1024/1024 ≈ 12M 的内存。 相比B+树确实节省不少，但是在某些非常大数据的场景下，如果有10000个对象有1亿数据，则需要120G内存，可以说在特定场景下内存的消耗还是蛮大的。
-- 概率算法，概率算法是通过牺牲准确率来换取空间，对于不要求绝对准确率的场景下，概率算法是一种不错的选择，因为概率算法不直接存储数据集合本身，通过一定的概率统计方法预估基数值，同时保证误差在一定范围内，这种方式可以大大减少内存。HyperLogLog就是概率算法的一种实现，下面重点介绍一下此算法。
-
-HyperLogLog 原理思路是通过给定 n 个的元素集合，记录集合中数字的比特串第一个1出现位置的最大值k，也可以理解为统计二进制低位连续为零的最大个数。通过k值可以估算集合中不重复元素的数量m，m近似等于2^k。
-
-下图来源于网络，通过给定一定数量的用户User，通过Hash得到一串Bitstring，记录其中最大连续零位的计数为4，User的不重复个数为 2 ^ 4 = 16
-
-![image-20200710215403750](./image/image-20200710215403750.png)
-
-
-
-Redis采用了16384个桶来存储计算HyperLogLog，那所占的内存会是多少？ Redis最大可以统计2^64个数据，也就是说每个桶的最大maxbits需要 6 个bit来存储(2^6=64)。那么所占内存就是 16384 * 6 / 8 = 12kb。
-
-* 目的是做基数统计，故不是集合，不会保存元数据，只记录数量而不是数值。
-* 耗空间极小，支持输入非常体积的数据量
-* 核心是基数估算算法，主要表现为计算时内存的使用和数据合并的处理。最终数值存在一定误差
-* redis中每个hyperloglog key占用了12K的内存用于标记基数（官方文档）
-* pfadd命令并不会一次性分配12k内存，而是随着基数的增加而逐渐增加内存分配；而pfmerge操作则会将sourcekey
-* 合并后存储在12k大小的key中，这由hyperloglog合并操作的原理（两个hyperloglog合并时需要单独比较每个桶的值）可以很容易理解。
-* 误差说明：基数估计的结果是一个带有 0.81% 标准错误（standard error）的近似值。是可接受的范围
-* Redis 对 HyperLogLog 的存储进行了优化，在计数比较小时，它的存储空间采用稀疏矩阵存储，空间占用很小，仅仅在计数慢慢变大，稀疏矩阵占用空间渐渐超过了阈值时才会一次性转变成稠密矩阵，才会占用 12k 的空间
-  
-
-
-
-## Sorted set(Zset)
-
-![image-20200727195050035](./image/image-20200727195050035.png)
 
 # Rabbitmq 
 
@@ -4791,7 +2508,6 @@ RabbitMQ，是一个消息代理和队列服务器，它实现了AMQP标准协�
 
 - 当 mandatory 为 true 时：如果交换器无法根据自身类型和路由键找到一个符合条件的队列，则会将该消息返回给生产者；
 - 当 mandatory 为 false 时：如果交换器无法根据自身类型和路由键找到一个符合条件的队列，则会直接丢弃该消息。
-
 
 作者：heibaiying
 链接：https://juejin.im/post/5e1302315188253a5d560145
@@ -5611,3 +3327,32 @@ https://zebinh.github.io/2020/03/SSOANDOAuth/
 
 
 ## 百亿级微信红包的高并发资金交易系统设计方案
+
+
+
+## 简易RPC 
+
+![image-20200830173259695](/Users/ano/Desktop/notes/image/image-20200830173259695.png)
+
+
+
+
+
+Netty reactor 模型
+
+加密算法： 对称加密，非对称 背！！！
+
+
+
+周五： 背数据库， 背java基础
+
+周六 ： 整理项目
+
+周日 ： 整理项目 jemeter 测压
+
+周一： 背java 背spring 
+
+周二： 背面经
+
+周三： 整理leetcode
+

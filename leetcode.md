@@ -1,4 +1,4 @@
-# Leetcode Crash
+# 3Leetcode Crash
 
 # hash map 	
 
@@ -6,7 +6,7 @@
 
 
 
-##### \3 Longest Substring Without Repeating Characters : (can compress to char[])
+##### \3 Longest Substring Without Repeating Characters : (can compress to char[]) 2 pointers 
 
 ```java
 for char j: string
@@ -25,26 +25,13 @@ for char j: string
 ```pseudocode
 f[i][v] = max(w[i]+f[i+1][v-c[i]],f[i+1][v]) //i: i -- end 将后i件物品放入容量为v的背包中
 int [][] f = new int [i][v];
-for(int i = N-1 ; i>= 0 ; i--){
-		for(int v = V ;v>=0;v--){
+for(int i = N - 1 ; i >= 0 ; i--){
+		for(int v = V ;v >= 0;v--){
 				 if(i>=N-1) f[i][v] = c[i]>=v? w[i]:0;
 			   else f[i][v] = max{f[i+1][v],f[i+1][v-c[i]]+w[i]};
      }
 }
 return f[0][V-1];
-
-
-
-//or
-f[i][v]=max{f[i-1][v],f[i-1][v-c[i]]+w[i]} //i 0---i 将前i件物品放入容量为v的背包中
-int [][] f = new int [i][v];
-for(int i = 0 ; i< N ; i++){
-		for(int v = V ;v>=0;v--){
-				 if(i-1<0) f[i][v] = c[i]>=v? w[i]:0;
-	   else f[i][v] = max{f[i-1][v],f[i-1][v-c[i]]+w[i]};
-	}
-}
-return f[V-1];
 
 
 //若只考虑第i件物品的策略（放或不放），那么就可以转化为一个只牵扯前i-1件物品的问题。如果不放第i件物品，那么问题就转化为“前i-1件物品放入容量为v的背包中”，价值为f[i-1][v]；如果放第i件物品，那么问题就转化为“前i-1件物品放入剩下的容量为v-c[i]的背包中”，此时能获得的最大价值就是f[i-1][v-c[i]]再加上通过放入第i件物品获得的价值w[i]。
@@ -116,7 +103,7 @@ return f[V-1];
 
   top-down
   memo[i][j] = if(s[i]==s[j]) 2 + memo[i-1][j-1] else Math.max(memo[i-1][j],memo[i][j-1])
-
+   
   expand from middle
   expand(s,i,j) :
     while(i>=0 and j<s.length)
@@ -127,14 +114,19 @@ return f[V-1];
   	expand(s,i,i) 
     expand(s,i,i+1)
 
-
-
 ```
 
 
 ​      
 
-##### \72. Edit Distance
+##### \72. Edit Distance 
+
+```
+  dp[i][j] = max{ dp[i-1][j],dp[i][j - 1 ]  ,dp[i-1][j-1 ]} +  1  if s[i]==s[j] 
+  					=  dp[ i - 1 ][ j - 1 ]
+```
+
+
 
 ```java
 class Solution {
@@ -196,6 +188,12 @@ class Solution {
 ​      
 
 ##### \91. Decode Ways
+
+``` 
+dp[i] = dp[ i - 1 ]  + dp[ i - 2 ]  if(valid(  substring(i- 1 -- i)  ) ) && valid( substring( i-2, i))
+```
+
+
 
 ```java
 public class Solution {
@@ -355,10 +353,7 @@ class Solution {
             res += Math.min(right[i],left[i]) - height[i];
         }
         return res;
-            
-        
 	}
-
 }
   ```
 
@@ -491,6 +486,24 @@ class Solution {
 	}
 }
 ```
+
+
+
+\1130. Minimum Cost Tree From Leaf Values
+
+```c
+dp[i, j] = dp[i, k] + dp[k + 1, j] + max(A[i, k]) * max(A[k + 1, j])
+```
+
+\1000 merge stone
+
+```
+Function:
+dp[i][j][1] = dp[i][j][K] + sum[i][j] (dp[i][j][K] != max)
+dp[i][j][k] = min(dp[i][t][k - 1] + dp[t + 1][j][1]) (t ∈ [i, j) && dp[i][t][k - 1] != max && dp[t+1][j][1] != max && k ∈ [2, K])
+```
+
+
 
 
 
@@ -766,13 +779,13 @@ class Solution {
 
    5. 问题转化为判断一个链表是否有环问题。
 
-![image-20200601113229407](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200601113229407.png)
+![image-20200601113229407](./image/image-20200601113229407.png)
 
 ​    快慢指针来判断是否有环
 
 
 
-![image-20200601113540328](/Users/lingjiarong/Library/Application Support/typora-user-images/image-20200601113540328.png)
+![image-20200601113540328](./image/image-20200601113540328.png)
 
 
 
@@ -2591,9 +2604,9 @@ class Solution {
 
 ```
 
+# 约瑟夫环
 
-
-
+![image-20200914184007062](/Users/ano/Desktop/notes/image/image-20200914184007062.png)
 
 ByteDance
 
@@ -2613,4 +2626,3 @@ arr2.length = n ;
    
    ```
 
-3. 
